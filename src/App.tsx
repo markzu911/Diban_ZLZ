@@ -23,7 +23,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-// import { GoogleGenAI, Type } from "@google/genai"; // Moved to backend
+import { GoogleGenAI, Type } from "@google/genai";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 // --- Types ---
 
@@ -348,13 +350,38 @@ export default function App() {
     try {
       const base64 = await fileToBase64(file);
       setRoomImgBase64(base64);
+      const pureBase64 = base64.split(',')[1];
 
-      const response = await axios.post('/api/ai/analyze-room', {
-        image: base64,
-        mimeType: file.type
+      const prompt = `Analyze this room image for floor replacement. Identify:
+      1. Space Type (e.g. Living Room, Bedroom)
+      2. Design Style (e.g. Modern, Vintage)
+      3. Current Floor Type
+      4. Lighting conditions
+      5. Furniture/Obstacles to preserve.
+      Return JSON format: {spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          { text: prompt },
+          { inlineData: { mimeType: file.type, data: pureBase64 } }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              spaceType: { type: Type.STRING },
+              designStyle: { type: Type.STRING },
+              currentFloor: { type: Type.STRING },
+              lighting: { type: Type.STRING },
+              obstacles: { type: Type.ARRAY, items: { type: Type.STRING } }
+            }
+          }
+        }
       });
 
-      const data = response.data;
+      const data = JSON.parse(response.text || '{}');
       setStep3({
         spaceType: data.spaceType || '客餐厅',
         designStyle: data.designStyle || '现代简约',
@@ -378,24 +405,46 @@ export default function App() {
     try {
       const base64 = await fileToBase64(file);
       setMaterialImgBase64(base64);
+      const pureBase64 = base64.split(',')[1];
 
-      const response = await axios.post('/api/ai/analyze-material', {
-        image: base64,
-        mimeType: file.type
+      const prompt = `Identify this flooring material sample. 
+      Analyze with extreme care for physical surface characteristics:
+      1. Material Name (e.g. "Natural Oak")
+      2. Shape of the units (e.g. "rectangular planks", "square tiles", "hexagon")
+      3. Pattern/Layout (e.g. "Herringbone", "Fishbone", "Straight", "Chessboard")
+      4. Texture/Grain (e.g. "deep wood grain", "smooth marble", "coarse stone")
+      5. Physical Relief/Bumps (e.g. "wavy irregular protrusions", "deeply embossed grain", "flat smooth surface", "three-dimensional relief"). 
+      6. Finish/Surface (e.g. "matte", "glossy", "brushed", "satin")
+      Return JSON: { materialName, shape, pattern, texture, relief, finish }`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          { text: prompt },
+          { inlineData: { mimeType: file.type, data: pureBase64 } }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              materialName: { type: Type.STRING },
+              shape: { type: Type.STRING },
+              pattern: { type: Type.STRING },
+              texture: { type: Type.STRING },
+              relief: { type: Type.STRING },
+              finish: { type: Type.STRING }
+            }
+          }
+        }
       });
 
-      const data = response.data;
+      const data = JSON.parse(response.text || '{}');
       if (data.materialName) {
         setStep3(prev => ({ 
           ...prev, 
           targetFloor: data.materialName,
-          floorDetails: {
-            shape: data.shape,
-            pattern: data.pattern,
-            texture: data.texture,
-            relief: data.relief,
-            finish: data.finish
-          }
+          floorDetails: data
         }));
       }
     } catch (error) {
@@ -410,8 +459,45 @@ export default function App() {
     if (!roomImgBase64) return;
     setIsAnalyzingRoom(true);
     try {
-      const response = await axios.post('/api/ai/recommend', { image: roomImgBase64 });
-      const data = response.data;
+      const pureBase64 = roomImgBase64.split(',')[1];
+      const prompt = `Based on this room image, recommend a flooring material that would look best. 
+      Consider the wall color, lighting, and existing style. 
+      Return JSON: { 
+        name: string, 
+        reason: string,
+        details: { color: string, shape: string, pattern: string, texture: string, relief: string, finish: string } 
+      }`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          { text: prompt },
+          { inlineData: { mimeType: "image/png", data: pureBase64 } }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              reason: { type: Type.STRING },
+              details: {
+                type: Type.OBJECT,
+                properties: {
+                  color: { type: Type.STRING, description: "Precise color name (e.g. 'Coffee Brown', 'Creamy White')" },
+                  shape: { type: Type.STRING },
+                  pattern: { type: Type.STRING },
+                  texture: { type: Type.STRING },
+                  relief: { type: Type.STRING },
+                  finish: { type: Type.STRING }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      const data = JSON.parse(response.text || '{}');
       if (data.name) {
         setStep3(prev => ({ 
           ...prev, 
@@ -508,15 +594,32 @@ export default function App() {
         ENVIRONMENT: ${step3.lighting} light. Preserve original room color temperature while applying the new floor.
         QUALITY: Photorealistic, 8k, physically accurate render.`;
 
-        const images = [roomImgBase64];
-        if (materialImgBase64) images.push(materialImgBase64);
+        const renderParts: any[] = [];
+        if (roomImgBase64) {
+          renderParts.push({ inlineData: { mimeType: "image/png", data: roomImgBase64.split(',')[1] } });
+        }
+        if (materialImgBase64) {
+          renderParts.push({ inlineData: { mimeType: "image/png", data: materialImgBase64.split(',')[1] } });
+        }
+        renderParts.push({ text: renderPrompt });
 
-        const aiResponse = await axios.post('/api/ai/generate', {
-          prompt: renderPrompt,
-          images: images
+        const aiResponse = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-image-preview',
+          contents: [{ parts: renderParts }],
+          config: {
+            imageConfig: {
+              aspectRatio: aspect,
+            }
+          }
         });
 
-        const imageUrl = aiResponse.data.imageUrl;
+        let imageUrl = "";
+        for (const part of aiResponse.candidates[0].content.parts) {
+          if (part.inlineData) {
+            imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+            break;
+          }
+        }
 
         if (imageUrl) {
           newResults.push({
