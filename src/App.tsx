@@ -1,4 +1,5 @@
-import { useState, type ReactNode, useRef } from 'react';
+import { useState, type ReactNode, useRef, useEffect } from 'react';
+import axios from 'axios';
 import { 
   Upload, 
   Image as ImageIcon, 
@@ -17,13 +18,12 @@ import {
   Download,
   Share2,
   Layers,
-  X
+  X,
+  CreditCard,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI, Type } from "@google/genai";
-
-// --- Gemini API Setup ---
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// import { GoogleGenAI, Type } from "@google/genai"; // Moved to backend
 
 // --- Types ---
 
@@ -209,7 +209,94 @@ const DisplayField = ({ label, icon: Icon, value }: { label: string, icon: any, 
   </div>
 );
 
+// --- SaaS Integration Types ---
+interface SaaSUser {
+  name: string;
+  enterprise: string;
+  integral: number;
+}
+
+interface SaasTool {
+  name: string;
+  integral: number;
+}
+
+interface SaaSState {
+  userId: string | null;
+  toolId: string | null;
+  user: SaaSUser | null;
+  tool: SaasTool | null;
+  initialized: boolean;
+  isVerifying: boolean;
+  insufficientPoints: boolean;
+}
+
 export default function App() {
+  // --- SaaS State ---
+  const [saas, setSaas] = useState<SaaSState>({
+    userId: null,
+    toolId: null,
+    user: null,
+    tool: null,
+    initialized: false,
+    isVerifying: false,
+    insufficientPoints: false
+  });
+
+  // --- postMessage Integration ---
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SAAS_INIT') {
+        const { userId, toolId, context, prompt: saasPrompts } = event.data;
+        
+        // ID Filtering
+        const cleanUserId = (userId === "null" || userId === "undefined") ? null : userId;
+        const cleanToolId = (toolId === "null" || toolId === "undefined") ? null : toolId;
+
+        if (cleanUserId && cleanToolId) {
+          setSaas(prev => ({ ...prev, userId: cleanUserId, toolId: cleanToolId }));
+          
+          // Apply initial context/prompts if provided
+          if (context || saasPrompts) {
+            setStep3(prev => ({
+              ...prev,
+              obstacles: Array.isArray(saasPrompts) ? [...prev.obstacles, ...saasPrompts] : prev.obstacles,
+              spaceType: context || prev.spaceType
+            }));
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // --- SaaS 1: Launch ---
+  useEffect(() => {
+    const launchTool = async () => {
+      if (saas.userId && saas.toolId && !saas.initialized) {
+        try {
+          const response = await axios.post('/api/tool/launch', {
+            userId: saas.userId,
+            toolId: saas.toolId
+          });
+          if (response.data.success) {
+            setSaas(prev => ({
+              ...prev,
+              user: response.data.data.user,
+              tool: response.data.data.tool,
+              initialized: true
+            }));
+          }
+        } catch (error) {
+          console.error("SaaS Launch Failed:", error);
+        }
+      }
+    };
+    launchTool();
+  }, [saas.userId, saas.toolId, saas.initialized]);
+
   const [roomImg, setRoomImg] = useState<string | null>(null);
   const [roomImgBase64, setRoomImgBase64] = useState<string | null>(null);
   const [materialImg, setMaterialImg] = useState<string | null>(null);
@@ -261,40 +348,13 @@ export default function App() {
     try {
       const base64 = await fileToBase64(file);
       setRoomImgBase64(base64);
-      const pureBase64 = base64.split(',')[1];
 
-      const prompt = `Analyze this room image for floor replacement. Identify:
-      1. Space Type (e.g. Living Room, Bedroom)
-      2. Design Style (e.g. Modern, Vintage)
-      3. Current Floor Type
-      4. Lighting conditions
-      5. Furniture/Obstacles to preserve.
-      Return JSON format: {spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: {
-          parts: [
-            { inlineData: { mimeType: file.type, data: pureBase64 } },
-            { text: prompt }
-          ]
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              spaceType: { type: Type.STRING },
-              designStyle: { type: Type.STRING },
-              currentFloor: { type: Type.STRING },
-              lighting: { type: Type.STRING },
-              obstacles: { type: Type.ARRAY, items: { type: Type.STRING } }
-            }
-          }
-        }
+      const response = await axios.post('/api/ai/analyze-room', {
+        image: base64,
+        mimeType: file.type
       });
 
-      const data = JSON.parse(response.text || '{}');
+      const data = response.data;
       setStep3({
         spaceType: data.spaceType || '客餐厅',
         designStyle: data.designStyle || '现代简约',
@@ -313,56 +373,18 @@ export default function App() {
     const url = URL.createObjectURL(file);
     setMaterialImg(url);
     setMaterialImgBase64(null);
-    setIsAnalyzingRoom(true); // Reuse loading state for material
+    setIsAnalyzingRoom(true); 
 
     try {
       const base64 = await fileToBase64(file);
       setMaterialImgBase64(base64);
-      const pureBase64 = base64.split(',')[1];
 
-      const prompt = `Identify this flooring material sample. 
-      Analyze with extreme care for physical surface characteristics:
-      1. Material Name (e.g. "Natural Oak")
-      2. Shape of the units (e.g. "rectangular planks", "square tiles", "hexagon")
-      3. Pattern/Layout (e.g. "Herringbone", "Fishbone", "Straight", "Chessboard")
-      4. Texture/Grain (e.g. "deep wood grain", "smooth marble", "coarse stone")
-      5. Physical Relief/Bumps (e.g. "wavy irregular protrusions", "deeply embossed grain", "flat smooth surface", "three-dimensional relief"). This is CRITICAL for materials with physical depth like wavy tiles.
-      6. Finish/Surface (e.g. "matte", "glossy", "brushed", "satin")
-
-      Return JSON: { 
-        materialName: string, 
-        shape: string, 
-        pattern: string, 
-        texture: string, 
-        relief: string,
-        finish: string 
-      }`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: {
-          parts: [
-            { inlineData: { mimeType: file.type, data: pureBase64 } },
-            { text: prompt }
-          ]
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              materialName: { type: Type.STRING },
-              shape: { type: Type.STRING },
-              pattern: { type: Type.STRING },
-              texture: { type: Type.STRING },
-              relief: { type: Type.STRING },
-              finish: { type: Type.STRING }
-            }
-          }
-        }
+      const response = await axios.post('/api/ai/analyze-material', {
+        image: base64,
+        mimeType: file.type
       });
 
-      const data = JSON.parse(response.text || '{}');
+      const data = response.data;
       if (data.materialName) {
         setStep3(prev => ({ 
           ...prev, 
@@ -388,54 +410,14 @@ export default function App() {
     if (!roomImgBase64) return;
     setIsAnalyzingRoom(true);
     try {
-      const pureBase64 = roomImgBase64.split(',')[1];
-      const prompt = `Based on this room image, recommend a flooring material that would look best. 
-      Consider the wall color, lighting, and existing style. 
-      Return JSON: { 
-        name: string, 
-        reason: string,
-        details: { color: string, shape: string, pattern: string, texture: string, relief: string, finish: string } 
-      }`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: {
-          parts: [
-            { inlineData: { mimeType: "image/png", data: pureBase64 } },
-            { text: prompt }
-          ]
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              reason: { type: Type.STRING },
-              details: {
-                type: Type.OBJECT,
-                properties: {
-                  color: { type: Type.STRING, description: "Precise color name (e.g. 'Coffee Brown', 'Creamy White')" },
-                  shape: { type: Type.STRING },
-                  pattern: { type: Type.STRING },
-                  texture: { type: Type.STRING },
-                  relief: { type: Type.STRING },
-                  finish: { type: Type.STRING }
-                }
-              }
-            }
-          }
-        }
-      });
-
-      const data = JSON.parse(response.text || '{}');
+      const response = await axios.post('/api/ai/recommend', { image: roomImgBase64 });
+      const data = response.data;
       if (data.name) {
         setStep3(prev => ({ 
           ...prev, 
           targetFloor: data.name,
           floorDetails: data.details || prev.floorDetails
         }));
-        // Clear manual material upload to prioritize AI recommendation
         setMaterialImg(null);
         setMaterialImgBase64(null);
       }
@@ -449,12 +431,34 @@ export default function App() {
   // --- Step 5: Generate ---
   const handleGenerate = async () => {
     if (!roomImg || angles.length === 0) return;
-    setIsGenerating(true);
+    
+    // --- SaaS 2: Verify ---
+    if (saas.userId && saas.toolId) {
+      setSaas(prev => ({ ...prev, isVerifying: true, insufficientPoints: false }));
+      try {
+        const verifyRes = await axios.post('/api/tool/verify', {
+          userId: saas.userId,
+          toolId: saas.toolId
+        });
+        
+        if (!verifyRes.data.success && !verifyRes.data.valid) {
+          setSaas(prev => ({ ...prev, insufficientPoints: true, isVerifying: false }));
+          return;
+        }
+      } catch (error) {
+        console.error("SaaS Verify Error:", error);
+        // Fail-safe: allowing if request fails but we should be careful here
+      } finally {
+        setSaas(prev => ({ ...prev, isVerifying: false }));
+      }
+    }
 
+    setIsGenerating(true);
     const newResults: RenderResult[] = [];
     
     try {
       for (const angle of angles) {
+        // ... previous logic
         let anglePrompt = "";
         
         // Detailed Logic per Angle
@@ -504,32 +508,15 @@ export default function App() {
         ENVIRONMENT: ${step3.lighting} light. Preserve original room color temperature while applying the new floor.
         QUALITY: Photorealistic, 8k, physically accurate render.`;
 
-        const renderParts: any[] = [];
-        if (roomImgBase64) {
-          renderParts.push({ inlineData: { mimeType: "image/png", data: roomImgBase64.split(',')[1] } });
-        }
-        if (materialImgBase64) {
-          renderParts.push({ inlineData: { mimeType: "image/png", data: materialImgBase64.split(',')[1] } });
-        }
-        renderParts.push({ text: renderPrompt });
+        const images = [roomImgBase64];
+        if (materialImgBase64) images.push(materialImgBase64);
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-image-preview',
-          contents: { parts: renderParts },
-          config: {
-            imageConfig: {
-              aspectRatio: aspect,
-            }
-          }
+        const aiResponse = await axios.post('/api/ai/generate', {
+          prompt: renderPrompt,
+          images: images
         });
 
-        let imageUrl = "";
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-            break;
-          }
-        }
+        const imageUrl = aiResponse.data.imageUrl;
 
         if (imageUrl) {
           newResults.push({
@@ -540,6 +527,27 @@ export default function App() {
             prompt: renderPrompt,
             params: { ...step3 }
           });
+        }
+      }
+
+      // --- SaaS 3: Consume ---
+      if (saas.userId && saas.toolId && newResults.length > 0) {
+        try {
+          const consumeRes = await axios.post('/api/tool/consume', {
+            userId: saas.userId,
+            toolId: saas.toolId
+          });
+          if (consumeRes.data.success) {
+            setSaas(prev => ({
+              ...prev,
+              user: prev.user ? {
+                ...prev.user,
+                integral: consumeRes.data.data.currentIntegral
+              } : null
+            }));
+          }
+        } catch (error) {
+          console.error("SaaS Consume Error:", error);
         }
       }
 
@@ -562,7 +570,59 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FD] font-sans text-gray-900 pb-20 selection:bg-[#5B50FF]/10">
+      {/* SaaS User Bar */}
+      {saas.initialized && saas.user && (
+        <div className="bg-white border-b border-gray-100 px-6 py-3 sticky top-0 z-50 shadow-sm backdrop-blur-md bg-white/80">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-gradient-to-tr from-[#5B50FF] to-[#8B50FF] rounded-xl flex items-center justify-center text-white font-black italic shadow-lg shadow-[#5B50FF]/20">
+                {saas.user.name.charAt(0)}
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-gray-900 leading-tight tracking-tight uppercase italic">{saas.user.name}</h4>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{saas.user.enterprise}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-6">
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">我的积分资产</span>
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-3.5 h-3.5 text-[#5B50FF]" />
+                  <span className="text-lg font-black text-gray-900 italic tracking-tighter">{saas.user.integral}</span>
+                </div>
+              </div>
+              <div className="h-8 w-px bg-gray-100" />
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">当前工具消耗</span>
+                <span className="text-sm font-black text-[#5B50FF] italic tracking-tight">-{saas.tool?.integral || 10} / 次</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="max-w-7xl mx-auto px-6 py-12">
+        {/* Alerts */}
+        <AnimatePresence>
+          {saas.insufficientPoints && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 shadow-sm"
+            >
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <p className="text-sm font-bold tracking-tight">账户积分不足，无法启动渲染。请及时充值或联系管理员。</p>
+              <button 
+                onClick={() => setSaas(p => ({ ...p, insufficientPoints: false }))}
+                className="ml-auto text-xs font-black uppercase tracking-widest bg-white px-4 py-2 rounded-xl shadow-sm border border-red-100 hover:bg-red-100 transition-colors"
+              >
+                我知道了
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         
         {/* Top Section Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -792,22 +852,37 @@ export default function App() {
             </Card>
 
             {/* Step 5: Generate */}
-            <button 
-              onClick={handleGenerate}
-              disabled={isGenerating || !roomImg}
-              className="w-full h-[140px] bg-[#0A0D18] rounded-[32px] group relative overflow-hidden flex flex-col items-center justify-center text-white transition-all active:scale-[0.98] hover:shadow-[0_20px_60px_rgba(0,0,0,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#5B50FF]/2 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[1500ms] cubic-bezier(0.4, 0, 0.2, 1)" />
-              <div className="w-14 h-14 bg-[#5B50FF] rounded-2xl flex items-center justify-center shadow-[0_4px_24px_rgba(91,80,255,0.4)] mb-4 group-hover:scale-110 transition-transform">
-                {isGenerating ? <Loader2 className="w-7 h-7 animate-spin" /> : <Sparkles className="w-7 h-7" />}
-              </div>
-              <h3 className="text-2xl font-black italic tracking-tight uppercase">
-                {isGenerating ? '正在生成渲染管线...' : '开启全景替换渲染'}
-              </h3>
-              <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-2">
-                {isGenerating ? '正在调用深度神经网络' : `${angles.length} 个视角准备就绪`}
-              </p>
-            </button>
+            <div className="space-y-4">
+              <button 
+                onClick={handleGenerate}
+                disabled={isGenerating || !roomImg || saas.isVerifying}
+                className="w-full h-[140px] bg-[#0A0D18] rounded-[32px] group relative overflow-hidden flex flex-col items-center justify-center text-white transition-all active:scale-[0.98] hover:shadow-[0_20px_60px_rgba(0,0,0,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#5B50FF]/2 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[1500ms] cubic-bezier(0.4, 0, 0.2, 1)" />
+                <div className="w-14 h-14 bg-[#5B50FF] rounded-2xl flex items-center justify-center shadow-[0_4px_24px_rgba(91,80,255,0.4)] mb-3 group-hover:scale-110 transition-transform">
+                  {isGenerating || saas.isVerifying ? <Loader2 className="w-7 h-7 animate-spin" /> : <Sparkles className="w-7 h-7" />}
+                </div>
+                <h3 className="text-2xl font-black italic tracking-tight uppercase leading-none">
+                  {isGenerating ? '正在生成渲染管线...' : saas.isVerifying ? '正在校验资产' : '开启全景替换渲染'}
+                </h3>
+                <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-2 overflow-hidden whitespace-nowrap text-ellipsis px-10">
+                  {isGenerating ? '正在调用深度神经网络' : saas.isVerifying ? '正在接洽 SaaS 授权服务器' : `${angles.length} 个视角准备就绪 • 预计消耗 ${saas.tool?.integral ? saas.tool.integral : 10} 积分`}
+                </p>
+              </button>
+              
+              {saas.initialized && saas.user && (
+                <div className="flex items-center justify-between px-6 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">SaaS 权限层已在线</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">资产余额:</span>
+                    <span className="text-xs font-black text-gray-900 italic">{saas.user.integral} pts</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
