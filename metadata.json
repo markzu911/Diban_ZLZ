@@ -1,0 +1,11 @@
+{
+  "name": "FloorAI - 智能地板替换",
+  "description": "基于AI的室内地板实景替换与渲染工具，支持多种材质选择与高质量场景输出。",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "Image Transformation",
+    "Scene Rendering"
+  ]
+}
