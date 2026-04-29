@@ -3,8 +3,13 @@ import axios from "axios";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
+import { GoogleGenAI } from "@google/genai";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize Gemini AI on the backend
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 async function startServer() {
   const app = express();
@@ -36,8 +41,6 @@ async function startServer() {
         data: req.body,
         headers: { 
           'Content-Type': 'application/json',
-          // Here you can add your backend-only SaaS Secret Key if needed
-          // 'X-SaaS-Key': process.env.SAAS_SECRET_KEY 
         }
       });
       res.status(response.status).json(response.data);
@@ -51,6 +54,22 @@ async function startServer() {
   app.post("/api/tool/launch", (req, res) => proxyRequest(req, res, "/api/tool/launch"));
   app.post("/api/tool/verify", (req, res) => proxyRequest(req, res, "/api/tool/verify"));
   app.post("/api/tool/consume", (req, res) => proxyRequest(req, res, "/api/tool/consume"));
+
+  // Generic Gemini API Proxy
+  app.post("/api/gemini", async (req, res) => {
+    try {
+      const { model, payload } = req.body;
+      console.log(`AI request for model: ${model}`);
+      const response = await ai.models.generateContent({
+        model,
+        ...payload
+      });
+      res.json(response);
+    } catch (error: any) {
+      console.error("Gemini Proxy Error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
