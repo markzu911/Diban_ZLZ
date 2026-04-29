@@ -23,19 +23,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-// import { GoogleGenAI, Type } from "@google/genai"; // Moved to backend proxy
-// const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-const Type = { 
-  OBJECT: 'OBJECT', 
-  STRING: 'STRING', 
-  ARRAY: 'ARRAY' 
-} as const;
-
-// Helper for backend AI calls
-const aiProxy = async (model: string, payload: any) => {
-  const res = await axios.post('/api/gemini', { model, payload });
-  return res.data;
-};
+import { Type } from "@google/genai";
+import { callGemini } from './lib/gemini';
 
 // --- Types ---
 
@@ -379,11 +368,12 @@ export default function App() {
       5. Furniture/Obstacles to preserve.
       Return JSON format: {spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
 
-      const response = await aiProxy("gemini-3-flash-preview", {
-        contents: [
+      const response = await callGemini({
+        model: "gemini-3-flash-preview",
+        contents: { parts: [
           { text: prompt },
           { inlineData: { mimeType: file.type, data: pureBase64 } }
-        ],
+        ]},
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -435,11 +425,12 @@ export default function App() {
       6. Finish/Surface (e.g. "matte", "glossy", "brushed", "satin")
       Return JSON: { materialName, shape, pattern, texture, relief, finish }`;
 
-      const response = await aiProxy("gemini-3-flash-preview", {
-        contents: [
+      const response = await callGemini({
+        model: "gemini-3-flash-preview",
+        contents: { parts: [
           { text: prompt },
           { inlineData: { mimeType: file.type, data: pureBase64 } }
-        ],
+        ]},
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -485,11 +476,12 @@ export default function App() {
         details: { color: string, shape: string, pattern: string, texture: string, relief: string, finish: string } 
       }`;
 
-      const response = await aiProxy("gemini-3-flash-preview", {
-        contents: [
+      const response = await callGemini({
+        model: "gemini-3-flash-preview",
+        contents: { parts: [
           { text: prompt },
           { inlineData: { mimeType: "image/png", data: pureBase64 } }
-        ],
+        ]},
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -620,8 +612,9 @@ export default function App() {
         }
         renderParts.push({ text: renderPrompt });
 
-        const aiResponse = await aiProxy('gemini-3.1-flash-image-preview', {
-          contents: [{ parts: renderParts }],
+        const aiResponse = await callGemini({
+          model: 'gemini-3.1-flash-image-preview',
+          contents: { parts: renderParts },
           config: {
             imageConfig: {
               aspectRatio: aspect,
