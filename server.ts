@@ -19,19 +19,9 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  // Root Debug Route
-  app.get("/ping", (req, res) => res.send(`pong - ${new Date().toISOString()}`));
-
-  // Debug Request Logger
-  app.use((req, res, next) => {
-    if (req.url.startsWith('/api')) {
-      console.log(`[API REQUEST] ${req.method} ${req.url}`);
-    }
-    next();
-  });
-
-  // CORS and Iframe Headers
+  // CORS and Iframe Headers - CRITICAL for this environment
   app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -64,37 +54,35 @@ async function startServer() {
     }
   };
 
-// SaaS Proxy Routes
-  const router = express.Router();
+  // Root Debug Route
+  app.get("/ping", (req, res) => res.send(`pong - ${new Date().toISOString()}`));
 
-  router.use((req, res, next) => {
-    console.log(`[API_ROUTER] ${req.method} ${req.url}`);
-    next();
-  });
-
-  router.get("/health", (req, res) => {
+  // API Health Check
+  app.get("/api/health", (req, res) => {
+    console.log("[API] Health check requested");
     res.json({ 
       status: "ok", 
       time: new Date().toISOString(), 
-      env: !!process.env.GEMINI_API_KEY,
-      headers: req.headers
+      env: !!process.env.GEMINI_API_KEY 
     });
   });
 
-  router.post("/tool/launch", (req, res) => proxyRequest(req, res, "/api/tool/launch"));
-  router.post("/tool/verify", (req, res) => proxyRequest(req, res, "/api/tool/verify"));
-  router.post("/tool/consume", (req, res) => proxyRequest(req, res, "/api/tool/consume"));
+  // SaaS Proxy Routes
+  app.post("/api/tool/launch", (req, res) => proxyRequest(req, res, "/api/tool/launch"));
+  app.post("/api/tool/verify", (req, res) => proxyRequest(req, res, "/api/tool/verify"));
+  app.post("/api/tool/consume", (req, res) => proxyRequest(req, res, "/api/tool/consume"));
 
-  router.post("/gemini", async (req, res) => {
+  // Gemini Proxy
+  app.post("/api/gemini", async (req, res) => {
+    console.log("[API] Gemini request received");
     try {
       const { model, payload } = req.body;
       if (!model) {
         return res.status(400).json({ error: "Missing model name" });
       }
       
-      console.log(`[AI] Processing request for model: ${model}`);
-      
       if (!process.env.GEMINI_API_KEY) {
+        console.error("[AI] GEMINI_API_KEY is not set");
         return res.status(500).json({ error: "GEMINI_API_KEY missing on server" });
       }
 
@@ -103,7 +91,6 @@ async function startServer() {
         ...payload
       });
       
-      // Handle the response getters properly
       res.json({
         text: response.text || "",
         candidates: response.candidates,
@@ -118,10 +105,7 @@ async function startServer() {
     }
   });
 
-  // Use the router for all /api requests
-  app.use("/api", router);
-
-  // API 404 Debugger - MUST be after the router
+  // API 404 Debugger - MUST be after all API routes but before Vite
   app.all("/api/*", (req, res) => {
     console.warn(`[API 404] NOT FOUND: ${req.method} ${req.url}`);
     res.status(404).json({ 
