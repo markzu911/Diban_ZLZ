@@ -33,37 +33,8 @@ const Type = {
 
 // Helper for backend AI calls
 const aiProxy = async (model: string, payload: any) => {
-  try {
-    // Using relative path without leading slash can be more robust in some proxy setups
-    const apiUrl = 'api/gemini';
-    console.log(`[AI] Calling proxy: ${apiUrl} for model: ${model}`);
-    const res = await axios.post(apiUrl, { model, payload });
-    return res.data;
-  } catch (error: any) {
-    if (error.response) {
-      const errorData = error.response.data;
-      console.error("AI Proxy Error details:", JSON.stringify(errorData, null, 2));
-      
-      let errorMsg = "后端接口返回错误";
-      if (typeof errorData === 'string') {
-        errorMsg = errorData;
-      } else if (errorData.error) {
-        if (typeof errorData.error === 'string') {
-          errorMsg = errorData.error;
-        } else {
-          errorMsg = errorData.error.message || JSON.stringify(errorData.error);
-        }
-      } else if (errorData.message) {
-        errorMsg = errorData.message;
-      } else {
-        errorMsg = JSON.stringify(errorData);
-      }
-      
-      throw new Error(errorMsg);
-    }
-    console.error("AI Proxy Network Error:", error.message);
-    throw error;
-  }
+  const res = await axios.post('/api/gemini', { model, payload });
+  return res.data;
 };
 
 // --- Types ---
@@ -286,22 +257,6 @@ export default function App() {
 
   // --- postMessage Integration ---
   useEffect(() => {
-    // Ping root to test connectivity
-    const testConnectivity = async () => {
-      const paths = ['/api/health', 'api/health', '/ping-root', 'ping-root'];
-      console.log("[SYS] Testing backend connectivity...");
-      for (const p of paths) {
-        try {
-          const res = await axios.get(p);
-          console.log(`[SYS] Reachable: ${p} ->`, res.data);
-        } catch (e: any) {
-          console.log(`[SYS] Unreachable: ${p} (${e.message})`);
-        }
-      }
-    };
-    
-    testConnectivity();
-
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'SAAS_INIT') {
         const { userId, toolId, context, prompt: saasPrompts } = event.data;
@@ -425,12 +380,10 @@ export default function App() {
       Return JSON format: {spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
 
       const response = await aiProxy("gemini-3-flash-preview", {
-        contents: {
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: file.type, data: pureBase64 } }
-          ]
-        },
+        contents: [
+          { text: prompt },
+          { inlineData: { mimeType: file.type, data: pureBase64 } }
+        ],
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -483,12 +436,10 @@ export default function App() {
       Return JSON: { materialName, shape, pattern, texture, relief, finish }`;
 
       const response = await aiProxy("gemini-3-flash-preview", {
-        contents: {
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: file.type, data: pureBase64 } }
-          ]
-        },
+        contents: [
+          { text: prompt },
+          { inlineData: { mimeType: file.type, data: pureBase64 } }
+        ],
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -535,12 +486,10 @@ export default function App() {
       }`;
 
       const response = await aiProxy("gemini-3-flash-preview", {
-        contents: {
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: "image/png", data: pureBase64 } }
-          ]
-        },
+        contents: [
+          { text: prompt },
+          { inlineData: { mimeType: "image/png", data: pureBase64 } }
+        ],
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -672,7 +621,7 @@ export default function App() {
         renderParts.push({ text: renderPrompt });
 
         const aiResponse = await aiProxy('gemini-3.1-flash-image-preview', {
-          contents: { parts: renderParts },
+          contents: [{ parts: renderParts }],
           config: {
             imageConfig: {
               aspectRatio: aspect,
