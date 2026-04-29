@@ -17,6 +17,12 @@ async function startServer() {
 
   app.use(express.json({ limit: '20mb' }));
 
+  // Debug Request Logger
+  app.use((req, res, next) => {
+    console.log(`[SERVER] ${req.method} ${req.url}`);
+    next();
+  });
+
   // CORS and Iframe Headers
   app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -59,16 +65,34 @@ async function startServer() {
   app.post("/api/gemini", async (req, res) => {
     try {
       const { model, payload } = req.body;
-      console.log(`AI request for model: ${model}`);
+      if (!model) {
+        return res.status(400).json({ error: "Missing model name" });
+      }
+      console.log(`[AI] Request for model: ${model}`);
       const response = await ai.models.generateContent({
         model,
         ...payload
       });
       res.json(response);
     } catch (error: any) {
-      console.error("Gemini Proxy Error:", error.message);
+      console.error("[AI ERROR] Gemini Proxy Error:", error.message);
       res.status(500).json({ error: error.message });
     }
+  });
+
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", time: new Date().toISOString() });
+  });
+
+  // API 404 Debugger - MUST be after all API routes but before Vite
+  app.all("/api/*", (req, res) => {
+    console.log(`[API 404] No route matched for ${req.method} ${req.url}`);
+    res.status(404).json({ 
+      error: "API Route Not Found", 
+      path: req.url, 
+      method: req.method,
+      tip: "Please check if the route is defined in server.ts" 
+    });
   });
 
   // Vite middleware for development

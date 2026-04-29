@@ -33,8 +33,16 @@ const Type = {
 
 // Helper for backend AI calls
 const aiProxy = async (model: string, payload: any) => {
-  const res = await axios.post('/api/gemini', { model, payload });
-  return res.data;
+  try {
+    const res = await axios.post('/api/gemini', { model, payload });
+    return res.data;
+  } catch (error: any) {
+    if (error.response) {
+      console.error("AI Proxy Error details:", error.response.data);
+      throw new Error(error.response.data.error || error.response.data.message || "后端接口返回错误");
+    }
+    throw error;
+  }
 };
 
 // --- Types ---
