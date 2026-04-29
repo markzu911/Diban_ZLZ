@@ -4,18 +4,24 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import "dotenv/config";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Gemini AI on the backend
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+// Use a getter or initialize inside startServer to ensure env is ready
+let ai: GoogleGenAI;
 
 async function startServer() {
+  ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
   const app = express();
   const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
+
+  // Root Debug Route
+  app.get("/ping", (req, res) => res.send(`pong - ${new Date().toISOString()}`));
 
   // Debug Request Logger
   app.use((req, res, next) => {
@@ -58,26 +64,38 @@ async function startServer() {
     }
   };
 
-  // SaaS Proxy Routes
-  app.post("/api/tool/launch", (req, res) => proxyRequest(req, res, "/api/tool/launch"));
-  app.post("/api/tool/verify", (req, res) => proxyRequest(req, res, "/api/tool/verify"));
-  app.post("/api/tool/consume", (req, res) => proxyRequest(req, res, "/api/tool/consume"));
+// SaaS Proxy Routes
+  const router = express.Router();
 
-  // Generic Gemini API Proxy
-  app.post("/api/gemini", async (req, res) => {
+  router.use((req, res, next) => {
+    console.log(`[API_ROUTER] ${req.method} ${req.url}`);
+    next();
+  });
+
+  router.get("/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      time: new Date().toISOString(), 
+      env: !!process.env.GEMINI_API_KEY,
+      headers: req.headers
+    });
+  });
+
+  router.post("/tool/launch", (req, res) => proxyRequest(req, res, "/api/tool/launch"));
+  router.post("/tool/verify", (req, res) => proxyRequest(req, res, "/api/tool/verify"));
+  router.post("/tool/consume", (req, res) => proxyRequest(req, res, "/api/tool/consume"));
+
+  router.post("/gemini", async (req, res) => {
     try {
       const { model, payload } = req.body;
       if (!model) {
-        console.error("[AI] Missing model name in request body");
         return res.status(400).json({ error: "Missing model name" });
       }
       
       console.log(`[AI] Processing request for model: ${model}`);
       
-      // Verification of API Key presence
-      if (!(process.env.GEMINI_API_KEY)) {
-        console.error("[AI ERROR] GEMINI_API_KEY is not set in environment");
-        return res.status(500).json({ error: "Internal Configuration Error: API Key missing" });
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: "GEMINI_API_KEY missing on server" });
       }
 
       const response = await ai.models.generateContent({
@@ -85,49 +103,31 @@ async function startServer() {
         ...payload
       });
       
-      // Explicitly pick properties as getters are not serialized by res.json()
-      let text = "";
-      try {
-        text = response.text;
-      } catch (e) {
-        console.warn("[AI] Accessing response.text failed, might be an image response or safety block");
-      }
-
+      // Handle the response getters properly
       res.json({
-        text: text,
+        text: response.text || "",
         candidates: response.candidates,
         usageMetadata: response.usageMetadata
       });
     } catch (error: any) {
-      console.error("[AI ERROR] Gemini Proxy Exception:", error.message);
-      // Detailed error for debugging
-      const status = error.status || 500;
-      const message = error.message || "Unknown Gemini API error";
-      res.status(status).json({ 
-        error: message,
+      console.error("[AI ERROR]", error.message);
+      res.status(error.status || 500).json({ 
+        error: error.message || "Gemini API error",
         details: error.response?.data || null 
       });
     }
   });
 
-  app.get("/api/health", (req, res) => {
-    res.json({ 
-      status: "ok", 
-      time: new Date().toISOString(), 
-      env: !!process.env.GEMINI_API_KEY,
-      origin: req.get('origin') || 'unknown',
-      host: req.get('host') || 'unknown'
-    });
-  });
+  // Use the router for all /api requests
+  app.use("/api", router);
 
-  // API 404 Debugger - MUST be after all API routes but before Vite
+  // API 404 Debugger - MUST be after the router
   app.all("/api/*", (req, res) => {
-    console.log(`[API 404] No route matched for ${req.method} ${req.url}`);
+    console.warn(`[API 404] NOT FOUND: ${req.method} ${req.url}`);
     res.status(404).json({ 
-      error: "Route Not Found on Backend", 
+      error: "API endpoint not found", 
       path: req.url, 
-      method: req.method,
-      tip: "Please check if the route is defined in server.ts and requested correctly" 
+      method: req.method 
     });
   });
 

@@ -34,7 +34,7 @@ const Type = {
 // Helper for backend AI calls
 const aiProxy = async (model: string, payload: any) => {
   try {
-    const apiUrl = `${window.location.origin}/api/gemini`;
+    const apiUrl = '/api/gemini';
     console.log(`[AI] Calling proxy: ${apiUrl} for model: ${model}`);
     const res = await axios.post(apiUrl, { model, payload });
     return res.data;
@@ -286,9 +286,9 @@ export default function App() {
   // --- postMessage Integration ---
   useEffect(() => {
     // Backend health check and SaaS handshake
-    axios.get(`${window.location.origin}/api/health`)
+    axios.get('/api/health')
       .then(res => console.log("[SYS] Backend reachable:", res.data))
-      .catch(err => console.error("[SYS] Backend unreachable at", window.location.origin, err));
+      .catch(err => console.error("[SYS] Backend unreachable", err));
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'SAAS_INIT') {
