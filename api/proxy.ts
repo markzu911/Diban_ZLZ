@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import axios from "axios";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const ai = new GoogleGenAI(process.env.GEMINI_API_KEY || "");
 
 export default async function handler(req: any, res: any) {
   // CORS Headers
@@ -35,12 +35,10 @@ export default async function handler(req: any, res: any) {
       const result = await modelInstance.generateContent(contents);
       const response = await result.response;
       
-      // Extract text for frontend convenience
-      const responseText = response.text();
-      
       return res.status(200).json({
-        ...response,
-        text: responseText
+        candidates: response.candidates,
+        usageMetadata: response.usageMetadata,
+        text: response.text(),
       });
     }
 
