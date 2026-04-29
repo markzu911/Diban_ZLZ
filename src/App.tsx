@@ -251,19 +251,28 @@ export default function App() {
       if (event.data?.type === 'SAAS_INIT') {
         const { userId, toolId, context, prompt: saasPrompts } = event.data;
         
-        // ID Filtering
-        const cleanUserId = (userId === "null" || userId === "undefined") ? null : userId;
-        const cleanToolId = (toolId === "null" || toolId === "undefined") ? null : toolId;
+        // ID Filtering according to V4-3Step spec
+        const filterId = (id: any) => (id === "null" || id === "undefined" || !id) ? null : String(id);
+        
+        const cleanUserId = filterId(userId);
+        const cleanToolId = filterId(toolId);
 
         if (cleanUserId && cleanToolId) {
-          setSaas(prev => ({ ...prev, userId: cleanUserId, toolId: cleanToolId }));
+          setSaas(prev => ({ 
+            ...prev, 
+            userId: cleanUserId, 
+            toolId: cleanToolId,
+            initialized: prev.userId === cleanUserId && prev.toolId === cleanToolId ? prev.initialized : false 
+          }));
           
-          // Apply initial context/prompts if provided
+          // Apply initial context (SaaS 内容主体) and prompts (补充关键词)
           if (context || saasPrompts) {
             setStep3(prev => ({
               ...prev,
-              obstacles: Array.isArray(saasPrompts) ? [...prev.obstacles, ...saasPrompts] : prev.obstacles,
-              spaceType: context || prev.spaceType
+              obstacles: Array.isArray(saasPrompts) 
+                ? [...new Set([...prev.obstacles, ...saasPrompts.filter(p => filterId(p))])] 
+                : prev.obstacles,
+              spaceType: (context && context !== "null") ? context : prev.spaceType
             }));
           }
         }
@@ -527,7 +536,8 @@ export default function App() {
           toolId: saas.toolId
         });
         
-        if (!verifyRes.data.success && !verifyRes.data.valid) {
+        // V4-3Step spec: "宽松校验"，只要 success: true 或 valid: true 即可
+        if (!(verifyRes.data.success || verifyRes.data.valid)) {
           setSaas(prev => ({ ...prev, insufficientPoints: true, isVerifying: false }));
           return;
         }
