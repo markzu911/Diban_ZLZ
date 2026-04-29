@@ -39,7 +39,18 @@ const aiProxy = async (model: string, payload: any) => {
   } catch (error: any) {
     if (error.response) {
       console.error("AI Proxy Error details:", error.response.data);
-      throw new Error(error.response.data.error || error.response.data.message || "后端接口返回错误");
+      const errorData = error.response.data;
+      let errorMsg = "后端接口返回错误";
+      
+      if (typeof errorData.error === 'string') {
+        errorMsg = errorData.error;
+      } else if (typeof errorData.error === 'object' && errorData.error !== null) {
+        errorMsg = errorData.error.message || JSON.stringify(errorData.error);
+      } else if (errorData.message) {
+        errorMsg = errorData.message;
+      }
+      
+      throw new Error(errorMsg);
     }
     throw error;
   }
@@ -388,10 +399,12 @@ export default function App() {
       Return JSON format: {spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
 
       const response = await aiProxy("gemini-3-flash-preview", {
-        contents: [
-          { text: prompt },
-          { inlineData: { mimeType: file.type, data: pureBase64 } }
-        ],
+        contents: {
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: file.type, data: pureBase64 } }
+          ]
+        },
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -444,10 +457,12 @@ export default function App() {
       Return JSON: { materialName, shape, pattern, texture, relief, finish }`;
 
       const response = await aiProxy("gemini-3-flash-preview", {
-        contents: [
-          { text: prompt },
-          { inlineData: { mimeType: file.type, data: pureBase64 } }
-        ],
+        contents: {
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: file.type, data: pureBase64 } }
+          ]
+        },
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -494,10 +509,12 @@ export default function App() {
       }`;
 
       const response = await aiProxy("gemini-3-flash-preview", {
-        contents: [
-          { text: prompt },
-          { inlineData: { mimeType: "image/png", data: pureBase64 } }
-        ],
+        contents: {
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: "image/png", data: pureBase64 } }
+          ]
+        },
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -629,7 +646,7 @@ export default function App() {
         renderParts.push({ text: renderPrompt });
 
         const aiResponse = await aiProxy('gemini-3.1-flash-image-preview', {
-          contents: [{ parts: renderParts }],
+          contents: { parts: renderParts },
           config: {
             imageConfig: {
               aspectRatio: aspect,

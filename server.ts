@@ -15,11 +15,13 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '20mb' }));
+  app.use(express.json({ limit: '50mb' }));
 
   // Debug Request Logger
   app.use((req, res, next) => {
-    console.log(`[SERVER] ${req.method} ${req.url}`);
+    if (req.url.startsWith('/api')) {
+      console.log(`[API REQUEST] ${req.method} ${req.url}`);
+    }
     next();
   });
 
@@ -39,7 +41,7 @@ async function startServer() {
 
   const proxyRequest = async (req: express.Request, res: express.Response, targetPath: string) => {
     const targetUrl = `http://aibigtree.com${targetPath}`;
-    console.log(`Proxying ${req.method} to ${targetUrl}`);
+    console.log(`[PROXY] ${req.method} to ${targetUrl}`);
     try {
       const response = await axios({
         method: req.method,
@@ -51,7 +53,7 @@ async function startServer() {
       });
       res.status(response.status).json(response.data);
     } catch (error: any) {
-      console.error("Proxy Error:", error.message);
+      console.error(`[PROXY ERROR] ${targetPath}:`, error.message);
       res.status(error.response?.status || 500).json(error.response?.data || { error: "代理转发失败" });
     }
   };
@@ -66,32 +68,53 @@ async function startServer() {
     try {
       const { model, payload } = req.body;
       if (!model) {
+        console.error("[AI] Missing model name in request body");
         return res.status(400).json({ error: "Missing model name" });
       }
-      console.log(`[AI] Request for model: ${model}`);
+      
+      console.log(`[AI] Processing request for model: ${model}`);
+      
+      // Verification of API Key presence
+      if (!(process.env.GEMINI_API_KEY)) {
+        console.error("[AI ERROR] GEMINI_API_KEY is not set in environment");
+        return res.status(500).json({ error: "Internal Configuration Error: API Key missing" });
+      }
+
       const response = await ai.models.generateContent({
         model,
         ...payload
       });
-      res.json(response);
+      
+      // Explicitly pick properties as getters are not serialized by res.json()
+      res.json({
+        text: response.text,
+        candidates: response.candidates,
+        usageMetadata: response.usageMetadata
+      });
     } catch (error: any) {
-      console.error("[AI ERROR] Gemini Proxy Error:", error.message);
-      res.status(500).json({ error: error.message });
+      console.error("[AI ERROR] Gemini Proxy Exception:", error.message);
+      // Detailed error for debugging
+      const status = error.status || 500;
+      const message = error.message || "Unknown Gemini API error";
+      res.status(status).json({ 
+        error: message,
+        details: error.response?.data || null 
+      });
     }
   });
 
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", time: new Date().toISOString() });
+    res.json({ status: "ok", time: new Date().toISOString(), env: !!process.env.GEMINI_API_KEY });
   });
 
   // API 404 Debugger - MUST be after all API routes but before Vite
   app.all("/api/*", (req, res) => {
     console.log(`[API 404] No route matched for ${req.method} ${req.url}`);
     res.status(404).json({ 
-      error: "API Route Not Found", 
+      error: "Route Not Found on Backend", 
       path: req.url, 
       method: req.method,
-      tip: "Please check if the route is defined in server.ts" 
+      tip: "Please check if the route is defined in server.ts and requested correctly" 
     });
   });
 
