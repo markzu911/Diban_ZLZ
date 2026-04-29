@@ -17,6 +17,12 @@ async function startServer() {
 
   app.use(express.json({ limit: '20mb' }));
 
+  // Debug Logger
+  app.use((req, res, next) => {
+    console.log(`[Request] ${req.method} ${req.url}`);
+    next();
+  });
+
   // CORS and Iframe Headers
   app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -31,9 +37,20 @@ async function startServer() {
     next();
   });
 
+  // Health check for debugging 404s
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      env: { 
+        hasApiKey: !!process.env.GEMINI_API_KEY,
+        nodeEnv: process.env.NODE_ENV
+      } 
+    });
+  });
+
   const proxyRequest = async (req: express.Request, res: express.Response, targetPath: string) => {
     const targetUrl = `http://aibigtree.com${targetPath}`;
-    console.log(`Proxying ${req.method} to ${targetUrl}`);
+    console.log(`[Proxy] ${req.method} ${req.url} -> ${targetUrl}`);
     try {
       const response = await axios({
         method: req.method,
@@ -41,32 +58,36 @@ async function startServer() {
         data: req.body,
         headers: { 
           'Content-Type': 'application/json',
-        }
+          'User-Agent': 'AI-Studio-App'
+        },
+        timeout: 10000 // 10s timeout
       });
+      console.log(`[Proxy Success] ${targetPath} -> ${response.status}`);
       res.status(response.status).json(response.data);
     } catch (error: any) {
-      console.error("Proxy Error:", error.message);
-      res.status(error.response?.status || 500).json(error.response?.data || { error: "代理转发失败" });
+      console.error(`[Proxy Error] ${targetPath}:`, error.response?.data || error.message);
+      res.status(error.response?.status || 500).json(error.response?.data || { success: false, message: "代理转发失败", error: error.message });
     }
   };
 
-  // SaaS Proxy Routes
+  // SaaS Proxy Routes - following V4-3Step naming
   app.post("/api/tool/launch", (req, res) => proxyRequest(req, res, "/api/tool/launch"));
   app.post("/api/tool/verify", (req, res) => proxyRequest(req, res, "/api/tool/verify"));
   app.post("/api/tool/consume", (req, res) => proxyRequest(req, res, "/api/tool/consume"));
 
-  // Generic Gemini API Proxy
+  // Generic Gemini API Proxy - handling /api/gemini correctly
   app.post("/api/gemini", async (req, res) => {
+    console.log(`[AI] Incoming request to /api/gemini`);
     try {
       const { model, payload } = req.body;
       if (!process.env.GEMINI_API_KEY) {
-        throw new Error("GEMINI_API_KEY is not configured in the environment.");
+        console.error("[AI Error] Missing GEMINI_API_KEY");
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
       }
       
-      console.log(`[AI] Request for model: ${model}`);
+      console.log(`[AI] Processing for model: ${model}`);
       const generativeModel = ai.getGenerativeModel({ model });
       
-      // Extract contents and generationConfig from payload
       const { contents, config, ...rest } = payload;
       
       const result = await generativeModel.generateContent({
@@ -76,20 +97,27 @@ async function startServer() {
       });
 
       const response = await result.response;
-      const text = response.text();
+      const text = response.text ? response.text() : "";
       
-      // Return both the raw response and the extracted text for convenience
+      console.log(`[AI Success] Generated response for ${model}`);
       res.json({
         ...response,
         text: text
       });
     } catch (error: any) {
-      console.error("[AI Error]:", error.message);
+      console.error("[AI Error]:", error.stack || error.message);
       res.status(500).json({ 
         error: error.message,
         details: "AI generation failed on the server."
       });
     }
+  });
+
+  // Alias for /api/generate if needed by best practices
+  app.post("/api/generate", (req, res) => {
+    // This could combine verify + generate + consume in one go for higher security
+    // For now, redirecting to /api/gemini to maintain compatibility
+    res.redirect(307, '/api/gemini');
   });
 
   // Vite middleware for development

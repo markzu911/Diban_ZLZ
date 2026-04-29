@@ -258,38 +258,49 @@ export default function App() {
   // --- postMessage Integration ---
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      // Security: validate origin if possible, but spec says '*' for now
       if (event.data?.type === 'SAAS_INIT') {
+        console.log("Received SAAS_INIT:", event.data);
         const { userId, toolId, context, prompt: saasPrompts } = event.data;
         
-        // ID Filtering according to V4-3Step spec
-        const filterId = (id: any) => (id === "null" || id === "undefined" || !id) ? null : String(id);
+        // Stricter filtering according to V4-3Step spec: "必须检查并排除 'null' 或 'undefined' 字符串"
+        const filterStr = (val: any) => {
+          if (val === null || val === undefined) return null;
+          const s = String(val).trim();
+          if (s === "null" || s === "undefined" || s === "") return null;
+          return s;
+        };
         
-        const cleanUserId = filterId(userId);
-        const cleanToolId = filterId(toolId);
+        const cleanUserId = filterStr(userId);
+        const cleanToolId = filterStr(toolId);
+        const cleanContext = filterStr(context);
 
         if (cleanUserId && cleanToolId) {
           setSaas(prev => ({ 
             ...prev, 
             userId: cleanUserId, 
             toolId: cleanToolId,
-            initialized: prev.userId === cleanUserId && prev.toolId === cleanToolId ? prev.initialized : false 
+            // Only reset initialized if IDs actually changed
+            initialized: (prev.userId === cleanUserId && prev.toolId === cleanToolId) ? prev.initialized : false 
           }));
           
           // Apply initial context (SaaS 内容主体) and prompts (补充关键词)
-          if (context || saasPrompts) {
-            setStep3(prev => ({
-              ...prev,
-              obstacles: Array.isArray(saasPrompts) 
-                ? [...new Set([...prev.obstacles, ...saasPrompts.filter(p => filterId(p))])] 
-                : prev.obstacles,
-              spaceType: (context && context !== "null") ? context : prev.spaceType
-            }));
-          }
+          const filteredPrompts = Array.isArray(saasPrompts) 
+            ? saasPrompts.map(p => filterStr(p)).filter((p): p is string => p !== null)
+            : [];
+
+          setStep3(prev => ({
+            ...prev,
+            spaceType: cleanContext || prev.spaceType,
+            obstacles: [...new Set([...prev.obstacles, ...filteredPrompts])]
+          }));
         }
       }
     };
 
     window.addEventListener('message', handleMessage);
+    // Notify parent that we are ready
+    window.parent.postMessage({ type: 'TOOL_READY' }, '*');
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
@@ -594,22 +605,28 @@ export default function App() {
         - Shape & Pattern: ${step3.floorDetails?.shape || 'Standard'} with ${step3.floorDetails?.pattern || 'Seamless'} layout.
         - Surface Detail: Match the physical relief/bumps (${step3.floorDetails?.relief || 'High-fidelity'}) and sheen (${step3.floorDetails?.finish || 'Natural'}) precisely.`;
 
-        const renderPrompt = `TASK: PRECISION ARCHITECTURAL FLOOR REPLACEMENT
+        const renderPrompt = `[CORE TASK: PRECISION ARCHITECTURAL FLOOR REPLACEMENT]
         
-        CRITICAL COLOR RULE: The output floor MUST match the exact chroma, saturation, and hue of the target material from Image 2. 
-        DO NOT allow the room's environmental lighting to fundamentally shift the perceived color of the material (no yellowing from warm lights or bluing from cold lights). 
-        The material's native color is the priority.
+        [SYNTHESIS FORMULA: INTERNAL STYLE + SAAS CONTEXT + SAAS PROMPTS]
         
-        INPUTS:
-        - Image 1: Room Geometry & Furniture (Preserve: ${step3.obstacles.join(', ')}).
-        ${materialImgBase64 ? '- Image 2: CHROMINANCE MASTER. This is the absolute truth for color. Replicate it 1:1.' : ''}
+        1. INTERNAL ARCHITECTURAL STYLE: 
+           - High-fidelity 8k photorealistic render.
+           - Preserve existing furniture and lighting atmosphere.
+           - Target Floor: ${step3.targetFloor} (${step3.floorDetails?.finish || 'natural finish'}).
+           ${anglePrompt}
 
-        ${anglePrompt}
+        2. SaaS CONTEXT (SPACE TYPE): 
+           - Environment: This is a ${step3.spaceType}. Ensure the lighting and scale feel appropriate for this functional area.
 
-        ${floorDesc}
+        3. SaaS PROMPTS (KEYWORD CONSTRAINTS): 
+           - Details to emphasize or preserve: ${step3.obstacles.join(', ') || 'standard architectural features'}.
 
-        ENVIRONMENT: ${step3.lighting} light. Preserve original room color temperature while applying the new floor.
-        QUALITY: Photorealistic, 8k, physically accurate render.`;
+        [CRITICAL COLOR INTEGRITY]
+        - Image 1 defines the room geometry.
+        - Image 2 (if present) is the MASTER SOURCE for the floor material which must be replicated 1:1 in terms of chroma and texture.
+        - DO NOT allow room lighting to shift the material's basic color balance.
+
+        QUALITY: Photorealistic, cinematic lighting, 8k resolution.`;
 
         const renderParts: any[] = [];
         if (roomImgBase64) {
@@ -654,7 +671,8 @@ export default function App() {
         try {
           const consumeRes = await axios.post('/api/tool/consume', {
             userId: saas.userId,
-            toolId: saas.toolId
+            toolId: saas.toolId,
+            requestId: Math.random().toString(36).substring(2) + Date.now().toString(36)
           });
           if (consumeRes.data.success) {
             setSaas(prev => ({
