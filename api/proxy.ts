@@ -25,10 +25,23 @@ export default async function handler(req: any, res: any) {
       }
 
       const { model, payload } = body;
-      const modelInstance = ai.getGenerativeModel({ model });
-      const result = await modelInstance.generateContent(payload);
+      const { contents, ...config } = payload || {};
+      
+      const modelInstance = ai.getGenerativeModel({ 
+        model,
+        generationConfig: config 
+      });
+      
+      const result = await modelInstance.generateContent(contents);
       const response = await result.response;
-      return res.status(200).json(response);
+      
+      // Extract text for frontend convenience
+      const responseText = response.text();
+      
+      return res.status(200).json({
+        ...response,
+        text: responseText
+      });
     }
 
     // 2. Handle Tool Proxying

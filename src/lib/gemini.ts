@@ -1,33 +1,34 @@
-import { GoogleGenAI } from "@google/genai";
-
 /**
- * Initializes the Gemini AI client using the platform-provided environment variable.
- * In the AI Studio/SaaS environment, process.env.GEMINI_API_KEY is handled externally.
- */
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-
-/**
- * Generic function to call Gemini directly from the frontend.
- * @param parameters - GenerateContentParameters including model, contents, and config.
- * @returns GenerateContentResponse
+ * Generic function to call Gemini through our backend proxy.
+ * This keeps the API key secure on the server.
  */
 export const callGemini = async (parameters: any) => {
   try {
-    // Check if we are in a dev environment without a key, though usually handled by platform
-    if (!process.env.GEMINI_API_KEY && !window.location.hostname.includes('localhost')) {
-      console.warn("GEMINI_API_KEY is not defined in the environment.");
+    const { model, contents, config } = parameters;
+    
+    const res = await fetch("/api/gemini", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json" 
+      },
+      body: JSON.stringify({
+        model: model,
+        payload: {
+          contents: contents,
+          ...config
+        }
+      }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `Proxy request failed with status ${res.status}`);
     }
 
-    const response = await ai.models.generateContent(parameters);
-    
-    // Ensure we return the standardized response object
-    if (!response) {
-      throw new Error("Empty response from Gemini API");
-    }
-    
-    return response;
+    const data = await res.json();
+    return data;
   } catch (error: any) {
-    console.error("Gemini Direct Call Error:", error);
+    console.error("Gemini Proxy Call Error:", error);
     throw error;
   }
 };
