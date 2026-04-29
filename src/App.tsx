@@ -34,24 +34,33 @@ const Type = {
 // Helper for backend AI calls
 const aiProxy = async (model: string, payload: any) => {
   try {
-    const res = await axios.post('/api/gemini', { model, payload });
+    const apiUrl = `${window.location.origin}/api/gemini`;
+    console.log(`[AI] Calling proxy: ${apiUrl} for model: ${model}`);
+    const res = await axios.post(apiUrl, { model, payload });
     return res.data;
   } catch (error: any) {
     if (error.response) {
-      console.error("AI Proxy Error details:", error.response.data);
       const errorData = error.response.data;
-      let errorMsg = "后端接口返回错误";
+      console.error("AI Proxy Error details:", JSON.stringify(errorData, null, 2));
       
-      if (typeof errorData.error === 'string') {
-        errorMsg = errorData.error;
-      } else if (typeof errorData.error === 'object' && errorData.error !== null) {
-        errorMsg = errorData.error.message || JSON.stringify(errorData.error);
+      let errorMsg = "后端接口返回错误";
+      if (typeof errorData === 'string') {
+        errorMsg = errorData;
+      } else if (errorData.error) {
+        if (typeof errorData.error === 'string') {
+          errorMsg = errorData.error;
+        } else {
+          errorMsg = errorData.error.message || JSON.stringify(errorData.error);
+        }
       } else if (errorData.message) {
         errorMsg = errorData.message;
+      } else {
+        errorMsg = JSON.stringify(errorData);
       }
       
       throw new Error(errorMsg);
     }
+    console.error("AI Proxy Network Error:", error.message);
     throw error;
   }
 };
@@ -276,6 +285,11 @@ export default function App() {
 
   // --- postMessage Integration ---
   useEffect(() => {
+    // Backend health check and SaaS handshake
+    axios.get(`${window.location.origin}/api/health`)
+      .then(res => console.log("[SYS] Backend reachable:", res.data))
+      .catch(err => console.error("[SYS] Backend unreachable at", window.location.origin, err));
+
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'SAAS_INIT') {
         const { userId, toolId, context, prompt: saasPrompts } = event.data;

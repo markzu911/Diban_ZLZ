@@ -86,8 +86,15 @@ async function startServer() {
       });
       
       // Explicitly pick properties as getters are not serialized by res.json()
+      let text = "";
+      try {
+        text = response.text;
+      } catch (e) {
+        console.warn("[AI] Accessing response.text failed, might be an image response or safety block");
+      }
+
       res.json({
-        text: response.text,
+        text: text,
         candidates: response.candidates,
         usageMetadata: response.usageMetadata
       });
@@ -104,7 +111,13 @@ async function startServer() {
   });
 
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", time: new Date().toISOString(), env: !!process.env.GEMINI_API_KEY });
+    res.json({ 
+      status: "ok", 
+      time: new Date().toISOString(), 
+      env: !!process.env.GEMINI_API_KEY,
+      origin: req.get('origin') || 'unknown',
+      host: req.get('host') || 'unknown'
+    });
   });
 
   // API 404 Debugger - MUST be after all API routes but before Vite
