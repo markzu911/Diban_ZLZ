@@ -1,7 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
 import axios from "axios";
-
-const ai = new GoogleGenAI(process.env.GEMINI_API_KEY || "");
 
 export default async function handler(req: any, res: any) {
   // CORS Headers
@@ -18,31 +15,7 @@ export default async function handler(req: any, res: any) {
   console.log(`Processing ${method} request for ${reqUrl}`);
 
   try {
-    // 1. Handle Gemini API
-    if (normalizedUrl.includes("/api/gemini")) {
-      if (method !== "POST") {
-        return res.status(405).json({ error: "Method Not Allowed" });
-      }
-
-      const { model, payload } = body;
-      const { contents, ...config } = payload || {};
-      
-      const modelInstance = ai.getGenerativeModel({ 
-        model,
-        generationConfig: config 
-      });
-      
-      const result = await modelInstance.generateContent(contents);
-      const response = await result.response;
-      
-      return res.status(200).json({
-        candidates: response.candidates,
-        usageMetadata: response.usageMetadata,
-        text: response.text(),
-      });
-    }
-
-    // 2. Handle Tool Proxying
+    // Handle Tool Proxying
     if (normalizedUrl.includes("/api/tool/")) {
       const toolSubPath = reqUrl.split(/\/api\/tool\//i)[1];
       if (!toolSubPath) {

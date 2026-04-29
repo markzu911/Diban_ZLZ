@@ -1,34 +1,23 @@
+import { GoogleGenAI } from "@google/genai";
+
 /**
- * Generic function to call Gemini through our backend proxy.
- * This keeps the API key secure on the server.
+ * Generic function to call Gemini through direct frontend SDK.
+ * This keeps the API key access to the frontend (provided via vite define).
  */
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+
 export const callGemini = async (parameters: any) => {
   try {
-    const { model, contents, config } = parameters;
+    // Parameters should match GenerateContentParameters: { model, contents, config }
+    const response = await ai.models.generateContent(parameters);
     
-    const res = await fetch("/api/gemini", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json" 
-      },
-      body: JSON.stringify({
-        model: model,
-        payload: {
-          contents: contents,
-          ...config
-        }
-      }),
-    });
-
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || `Proxy request failed with status ${res.status}`);
+    if (!response) {
+      throw new Error("Empty response from Gemini API");
     }
 
-    const data = await res.json();
-    return data;
+    return response;
   } catch (error: any) {
-    console.error("Gemini Proxy Call Error:", error);
+    console.error("Gemini Direct Call Error:", error);
     throw error;
   }
 };
