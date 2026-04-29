@@ -19,7 +19,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '20mb' }));
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Debug Logger
   app.use((req, res, next) => {
@@ -90,20 +91,40 @@ async function startServer() {
       }
       
       console.log(`[AI] Processing for model: ${model}`);
-      const generativeModel = ai.getGenerativeModel({ model: model || "gemini-3-flash-preview" });
+      const generativeModel = ai.getGenerativeModel({ 
+        model: model || "gemini-1.5-flash", 
+      });
       
-      const { contents, config, ...rest } = payload;
+      // Ensure specific structure for contents
+      let { contents, config } = payload;
+      
+      // If config is missing, provide a safe default
+      const generationConfig = config || {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      };
+
+      console.log(`[AI] Calling generateContent with payload size: ${JSON.stringify(payload).length} bytes`);
       
       const result = await generativeModel.generateContent({
         contents,
-        generationConfig: config,
-        ...rest
+        generationConfig,
       });
 
       const response = await result.response;
-      const text = response.text ? response.text() : "";
+      
+      // Handle the case where response might not have a text() method (e.g. image output)
+      let text = "";
+      try {
+        text = response.text();
+      } catch (e) {
+        console.log("[AI] Response does not contain text segment (expected for image candidates)");
+      }
       
       console.log(`[AI Success] Generated response for ${model}`);
+      // Send back the whole response candidates for the client to parse, plus extracted text
       res.json({
         ...response,
         text: text
@@ -117,18 +138,41 @@ async function startServer() {
     }
   };
 
-  app.post("/api/gemini", handleGeminiRequest);
-  app.post("/api/gemini/", handleGeminiRequest);
-  app.post("/api/generate", handleGeminiRequest);
-  app.post("/api/generate/", handleGeminiRequest);
-  app.post("/gemini", handleGeminiRequest); // In case /api prefix is stripped by proxy
-  app.post("/generate", handleGeminiRequest);
+  // Consolidated AI Route matching
+  const aiRoutes = [
+    "/api/gemini",
+    "/api/gemini/",
+    "/api/generate",
+    "/api/generate/",
+    "/gemini",
+    "/generate"
+  ];
+
+  aiRoutes.forEach(route => {
+    app.post(route, handleGeminiRequest);
+  });
+
+  // Global Error Handler for JSON parsing errors (like 413)
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err.type === 'entity.too.large') {
+      console.error(`[413] Payload too large. Content-Length: ${req.headers['content-length']}`);
+      res.status(413).json({ 
+        success: false, 
+        message: "请求数据过大（图片过多或过大），请压缩后重试。",
+        error: "Request Entity Too Large",
+        limit: "50mb"
+      });
+      return;
+    }
+    console.error("[Server Error]", err.message);
+    res.status(500).json({ error: "服务器内部错误", details: err.message });
+  });
 
   // Fallback for any other API routes to help debug 404s
   app.all("/api/*", (req, res) => {
     console.warn(`[404] Unhandled API Request: ${req.method} ${req.url}`);
     res.status(404).json({ 
-      error: "API route not found", 
+      error: "Route not found in API context", 
       path: req.url,
       method: req.method 
     });

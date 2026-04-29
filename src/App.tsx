@@ -33,8 +33,15 @@ const Type = {
 
 // Helper for backend AI calls
 const aiProxy = async (model: string, payload: any) => {
-  const res = await axios.post('/api/gemini', { model, payload });
-  return res.data;
+  try {
+    const res = await axios.post('/api/gemini', { model, payload }, {
+      timeout: 60000 // 60s timeout for AI
+    });
+    return res.data;
+  } catch (error: any) {
+    console.error(`AI Proxy Error (${model}):`, error.response?.data || error.message);
+    throw error;
+  }
 };
 
 // --- Types ---
@@ -360,12 +367,39 @@ export default function App() {
 
   const [customFurniture, setCustomFurniture] = useState('');
 
-  // --- Helper: File to Base64 ---
-  const fileToBase64 = (file: File): Promise<string> => {
+  // --- Helper: File to Base64 with Compression ---
+  const fileToBase64 = (file: File, compress = false): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        if (!compress) {
+          resolve(base64);
+          return;
+        }
+        
+        const img = new Image();
+        img.src = base64;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1280;
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > MAX_WIDTH) {
+            height = (MAX_WIDTH / width) * height;
+            width = MAX_WIDTH;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => resolve(base64);
+      };
       reader.onerror = error => reject(error);
     });
   };
@@ -374,11 +408,11 @@ export default function App() {
   const handleRoomUpload = async (file: File) => {
     const url = URL.createObjectURL(file);
     setRoomImg(url);
-    setRoomImgBase64(null); // Clear previous to prevent mixups
+    setRoomImgBase64(null); 
     setIsAnalyzingRoom(true);
 
     try {
-      const base64 = await fileToBase64(file);
+      const base64 = await fileToBase64(file, true); // Compress room image
       setRoomImgBase64(base64);
       const pureBase64 = base64.split(',')[1];
 
@@ -390,10 +424,10 @@ export default function App() {
       5. Furniture/Obstacles to preserve.
       Return JSON format: {spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
 
-      const response = await aiProxy("gemini-3-flash-preview", {
+      const response = await aiProxy("gemini-1.5-flash", { 
         contents: [
           { parts: [{ text: prompt }] },
-          { parts: [{ inlineData: { mimeType: file.type, data: pureBase64 } }] }
+          { parts: [{ inlineData: { mimeType: "image/jpeg", data: pureBase64 } }] }
         ],
         config: {
           responseMimeType: "application/json",
@@ -432,7 +466,7 @@ export default function App() {
     setIsAnalyzingRoom(true); 
 
     try {
-      const base64 = await fileToBase64(file);
+      const base64 = await fileToBase64(file, true); // Compress material sample
       setMaterialImgBase64(base64);
       const pureBase64 = base64.split(',')[1];
 
@@ -446,10 +480,10 @@ export default function App() {
       6. Finish/Surface (e.g. "matte", "glossy", "brushed", "satin")
       Return JSON: { materialName, shape, pattern, texture, relief, finish }`;
 
-      const response = await aiProxy("gemini-3-flash-preview", {
+      const response = await aiProxy("gemini-1.5-flash", { 
         contents: [
           { parts: [{ text: prompt }] },
-          { parts: [{ inlineData: { mimeType: file.type, data: pureBase64 } }] }
+          { parts: [{ inlineData: { mimeType: "image/jpeg", data: pureBase64 } }] }
         ],
         config: {
           responseMimeType: "application/json",
@@ -496,10 +530,10 @@ export default function App() {
         details: { color: string, shape: string, pattern: string, texture: string, relief: string, finish: string } 
       }`;
 
-      const response = await aiProxy("gemini-3-flash-preview", {
+      const response = await aiProxy("gemini-1.5-flash", { 
         contents: [
           { parts: [{ text: prompt }] },
-          { parts: [{ inlineData: { mimeType: "image/png", data: pureBase64 } }] }
+          { parts: [{ inlineData: { mimeType: "image/jpeg", data: pureBase64 } }] }
         ],
         config: {
           responseMimeType: "application/json",
@@ -637,7 +671,7 @@ export default function App() {
         }
         renderParts.push({ text: renderPrompt });
 
-        const aiResponse = await aiProxy('gemini-3.1-flash-image-preview', {
+        const aiResponse = await aiProxy('gemini-1.5-flash', { 
           contents: [{ parts: renderParts }],
           config: {
             imageConfig: {
