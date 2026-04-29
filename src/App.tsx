@@ -34,7 +34,8 @@ const Type = {
 // Helper for backend AI calls
 const aiProxy = async (model: string, payload: any) => {
   try {
-    const apiUrl = '/api/gemini';
+    // Using relative path without leading slash can be more robust in some proxy setups
+    const apiUrl = 'api/gemini';
     console.log(`[AI] Calling proxy: ${apiUrl} for model: ${model}`);
     const res = await axios.post(apiUrl, { model, payload });
     return res.data;
@@ -285,10 +286,21 @@ export default function App() {
 
   // --- postMessage Integration ---
   useEffect(() => {
-    // Backend health check and SaaS handshake
-    axios.get('/api/health')
-      .then(res => console.log("[SYS] Backend reachable:", res.data))
-      .catch(err => console.error("[SYS] Backend unreachable", err));
+    // Ping root to test connectivity
+    const testConnectivity = async () => {
+      const paths = ['/api/health', 'api/health', '/ping-root', 'ping-root'];
+      console.log("[SYS] Testing backend connectivity...");
+      for (const p of paths) {
+        try {
+          const res = await axios.get(p);
+          console.log(`[SYS] Reachable: ${p} ->`, res.data);
+        } catch (e: any) {
+          console.log(`[SYS] Unreachable: ${p} (${e.message})`);
+        }
+      }
+    };
+    
+    testConnectivity();
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'SAAS_INIT') {

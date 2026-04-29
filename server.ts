@@ -18,6 +18,15 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // 1. ABSOLUTELY FIRST: Total Request Logger for Debugging
+  app.use((req, res, next) => {
+    console.log(`[SERVER_LOG] ${new Date().toISOString()} | ${req.method} ${req.url} | Host: ${req.headers.host}`);
+    next();
+  });
+
+  // 2. ABSOLUTELY SECOND: Top-level Ping (Non-API)
+  app.get("/ping-root", (req, res) => res.send("pong-root"));
+
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -59,12 +68,24 @@ async function startServer() {
 
   // API Health Check
   app.get("/api/health", (req, res) => {
-    console.log("[API] Health check requested");
+    console.log("[API] Health check requested from:", req.ip);
     res.json({ 
       status: "ok", 
+      mode: process.env.NODE_ENV || "development",
       time: new Date().toISOString(), 
       env: !!process.env.GEMINI_API_KEY 
     });
+  });
+
+  // Debug route to see all registered routes
+  app.get("/api/debug/routes", (req, res) => {
+    const routes: string[] = [];
+    app._router.stack.forEach((middleware: any) => {
+      if (middleware.route) {
+        routes.push(`${Object.keys(middleware.route.methods).join(',').toUpperCase()} ${middleware.route.path}`);
+      }
+    });
+    res.json({ routes });
   });
 
   // SaaS Proxy Routes
@@ -74,16 +95,16 @@ async function startServer() {
 
   // Gemini Proxy
   app.post("/api/gemini", async (req, res) => {
-    console.log("[API] Gemini request received");
+    console.log("[API] Gemini request received:", req.body?.model);
     try {
       const { model, payload } = req.body;
       if (!model) {
-        return res.status(400).json({ error: "Missing model name" });
+        return res.status(400).json({ error: "Missing model name in body" });
       }
       
       if (!process.env.GEMINI_API_KEY) {
-        console.error("[AI] GEMINI_API_KEY is not set");
-        return res.status(500).json({ error: "GEMINI_API_KEY missing on server" });
+        console.error("[AI] GEMINI_API_KEY is not set in process.env");
+        return res.status(500).json({ error: "GEMINI_API_KEY missing on server environment" });
       }
 
       const response = await ai.models.generateContent({
@@ -97,7 +118,7 @@ async function startServer() {
         usageMetadata: response.usageMetadata
       });
     } catch (error: any) {
-      console.error("[AI ERROR]", error.message);
+      console.error("[AI ERROR] Gemini Exception:", error.message);
       res.status(error.status || 500).json({ 
         error: error.message || "Gemini API error",
         details: error.response?.data || null 
@@ -105,11 +126,11 @@ async function startServer() {
     }
   });
 
-  // API 404 Debugger - MUST be after all API routes but before Vite
+  // API 404 Handler - MUST be after our API routes but before Vite
   app.all("/api/*", (req, res) => {
     console.warn(`[API 404] NOT FOUND: ${req.method} ${req.url}`);
     res.status(404).json({ 
-      error: "API endpoint not found", 
+      error: "API endpoint not found (Custom Express 404)", 
       path: req.url, 
       method: req.method 
     });
