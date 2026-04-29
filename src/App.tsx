@@ -32,24 +32,9 @@ const Type = {
 } as const;
 
 // Helper for backend AI calls
-const getApiUrl = (path: string) => {
-  // Ensure we hit the app's own origin even if embedded
-  const base = typeof window !== 'undefined' ? window.location.origin : '';
-  return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
-};
-
 const aiProxy = async (model: string, payload: any) => {
-  const url = getApiUrl('/api/gemini');
-  console.log(`[AI] Calling Proxy: ${url} (model: ${model})`);
-  try {
-    const res = await axios.post(url, { model, payload }, {
-      timeout: 60000 // 60s timeout for AI
-    });
-    return res.data;
-  } catch (error: any) {
-    console.error(`AI Proxy Error (${model}):`, error.response?.data || error.message);
-    throw error;
-  }
+  const res = await axios.post('/api/gemini', { model, payload });
+  return res.data;
 };
 
 // --- Types ---
@@ -273,49 +258,38 @@ export default function App() {
   // --- postMessage Integration ---
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Security: validate origin if possible, but spec says '*' for now
       if (event.data?.type === 'SAAS_INIT') {
-        console.log("Received SAAS_INIT:", event.data);
         const { userId, toolId, context, prompt: saasPrompts } = event.data;
         
-        // Stricter filtering according to V4-3Step spec: "必须检查并排除 'null' 或 'undefined' 字符串"
-        const filterStr = (val: any) => {
-          if (val === null || val === undefined) return null;
-          const s = String(val).trim();
-          if (s === "null" || s === "undefined" || s === "") return null;
-          return s;
-        };
+        // ID Filtering according to V4-3Step spec
+        const filterId = (id: any) => (id === "null" || id === "undefined" || !id) ? null : String(id);
         
-        const cleanUserId = filterStr(userId);
-        const cleanToolId = filterStr(toolId);
-        const cleanContext = filterStr(context);
+        const cleanUserId = filterId(userId);
+        const cleanToolId = filterId(toolId);
 
         if (cleanUserId && cleanToolId) {
           setSaas(prev => ({ 
             ...prev, 
             userId: cleanUserId, 
             toolId: cleanToolId,
-            // Only reset initialized if IDs actually changed
-            initialized: (prev.userId === cleanUserId && prev.toolId === cleanToolId) ? prev.initialized : false 
+            initialized: prev.userId === cleanUserId && prev.toolId === cleanToolId ? prev.initialized : false 
           }));
           
           // Apply initial context (SaaS 内容主体) and prompts (补充关键词)
-          const filteredPrompts = Array.isArray(saasPrompts) 
-            ? saasPrompts.map(p => filterStr(p)).filter((p): p is string => p !== null)
-            : [];
-
-          setStep3(prev => ({
-            ...prev,
-            spaceType: cleanContext || prev.spaceType,
-            obstacles: [...new Set([...prev.obstacles, ...filteredPrompts])]
-          }));
+          if (context || saasPrompts) {
+            setStep3(prev => ({
+              ...prev,
+              obstacles: Array.isArray(saasPrompts) 
+                ? [...new Set([...prev.obstacles, ...saasPrompts.filter(p => filterId(p))])] 
+                : prev.obstacles,
+              spaceType: (context && context !== "null") ? context : prev.spaceType
+            }));
+          }
         }
       }
     };
 
     window.addEventListener('message', handleMessage);
-    // Notify parent that we are ready
-    window.parent.postMessage({ type: 'TOOL_READY' }, '*');
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
@@ -324,7 +298,7 @@ export default function App() {
     const launchTool = async () => {
       if (saas.userId && saas.toolId && !saas.initialized) {
         try {
-          const response = await axios.post(getApiUrl('/api/tool/launch'), {
+          const response = await axios.post('/api/tool/launch', {
             userId: saas.userId,
             toolId: saas.toolId
           });
@@ -375,39 +349,12 @@ export default function App() {
 
   const [customFurniture, setCustomFurniture] = useState('');
 
-  // --- Helper: File to Base64 with Compression ---
-  const fileToBase64 = (file: File, compress = false): Promise<string> => {
+  // --- Helper: File to Base64 ---
+  const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        if (!compress) {
-          resolve(base64);
-          return;
-        }
-        
-        const img = new Image();
-        img.src = base64;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1280;
-          let width = img.width;
-          let height = img.height;
-          
-          if (width > MAX_WIDTH) {
-            height = (MAX_WIDTH / width) * height;
-            width = MAX_WIDTH;
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = () => resolve(base64);
-      };
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = error => reject(error);
     });
   };
@@ -416,11 +363,11 @@ export default function App() {
   const handleRoomUpload = async (file: File) => {
     const url = URL.createObjectURL(file);
     setRoomImg(url);
-    setRoomImgBase64(null); 
+    setRoomImgBase64(null); // Clear previous to prevent mixups
     setIsAnalyzingRoom(true);
 
     try {
-      const base64 = await fileToBase64(file, true); // Compress room image
+      const base64 = await fileToBase64(file);
       setRoomImgBase64(base64);
       const pureBase64 = base64.split(',')[1];
 
@@ -432,13 +379,12 @@ export default function App() {
       5. Furniture/Obstacles to preserve.
       Return JSON format: {spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
 
-      const response = await aiProxy("gemini-3-flash-preview", { 
+      const response = await aiProxy("gemini-3-flash-preview", {
         contents: [
-          { parts: [{ text: prompt }] },
-          { parts: [{ inlineData: { mimeType: "image/jpeg", data: pureBase64 } }] }
+          { text: prompt },
+          { inlineData: { mimeType: file.type, data: pureBase64 } }
         ],
         config: {
-          temperature: 0.4,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -475,7 +421,7 @@ export default function App() {
     setIsAnalyzingRoom(true); 
 
     try {
-      const base64 = await fileToBase64(file, true); // Compress material sample
+      const base64 = await fileToBase64(file);
       setMaterialImgBase64(base64);
       const pureBase64 = base64.split(',')[1];
 
@@ -489,13 +435,12 @@ export default function App() {
       6. Finish/Surface (e.g. "matte", "glossy", "brushed", "satin")
       Return JSON: { materialName, shape, pattern, texture, relief, finish }`;
 
-      const response = await aiProxy("gemini-3-flash-preview", { 
+      const response = await aiProxy("gemini-3-flash-preview", {
         contents: [
-          { parts: [{ text: prompt }] },
-          { parts: [{ inlineData: { mimeType: "image/jpeg", data: pureBase64 } }] }
+          { text: prompt },
+          { inlineData: { mimeType: file.type, data: pureBase64 } }
         ],
         config: {
-          temperature: 0.4,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -540,13 +485,12 @@ export default function App() {
         details: { color: string, shape: string, pattern: string, texture: string, relief: string, finish: string } 
       }`;
 
-      const response = await aiProxy("gemini-3-flash-preview", { 
+      const response = await aiProxy("gemini-3-flash-preview", {
         contents: [
-          { parts: [{ text: prompt }] },
-          { parts: [{ inlineData: { mimeType: "image/jpeg", data: pureBase64 } }] }
+          { text: prompt },
+          { inlineData: { mimeType: "image/png", data: pureBase64 } }
         ],
         config: {
-          temperature: 0.7,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -594,7 +538,7 @@ export default function App() {
     if (saas.userId && saas.toolId) {
       setSaas(prev => ({ ...prev, isVerifying: true, insufficientPoints: false }));
       try {
-        const verifyRes = await axios.post(getApiUrl('/api/tool/verify'), {
+        const verifyRes = await axios.post('/api/tool/verify', {
           userId: saas.userId,
           toolId: saas.toolId
         });
@@ -650,28 +594,22 @@ export default function App() {
         - Shape & Pattern: ${step3.floorDetails?.shape || 'Standard'} with ${step3.floorDetails?.pattern || 'Seamless'} layout.
         - Surface Detail: Match the physical relief/bumps (${step3.floorDetails?.relief || 'High-fidelity'}) and sheen (${step3.floorDetails?.finish || 'Natural'}) precisely.`;
 
-        const renderPrompt = `[CORE TASK: PRECISION ARCHITECTURAL FLOOR REPLACEMENT]
+        const renderPrompt = `TASK: PRECISION ARCHITECTURAL FLOOR REPLACEMENT
         
-        [SYNTHESIS FORMULA: INTERNAL STYLE + SAAS CONTEXT + SAAS PROMPTS]
+        CRITICAL COLOR RULE: The output floor MUST match the exact chroma, saturation, and hue of the target material from Image 2. 
+        DO NOT allow the room's environmental lighting to fundamentally shift the perceived color of the material (no yellowing from warm lights or bluing from cold lights). 
+        The material's native color is the priority.
         
-        1. INTERNAL ARCHITECTURAL STYLE: 
-           - High-fidelity 8k photorealistic render.
-           - Preserve existing furniture and lighting atmosphere.
-           - Target Floor: ${step3.targetFloor} (${step3.floorDetails?.finish || 'natural finish'}).
-           ${anglePrompt}
+        INPUTS:
+        - Image 1: Room Geometry & Furniture (Preserve: ${step3.obstacles.join(', ')}).
+        ${materialImgBase64 ? '- Image 2: CHROMINANCE MASTER. This is the absolute truth for color. Replicate it 1:1.' : ''}
 
-        2. SaaS CONTEXT (SPACE TYPE): 
-           - Environment: This is a ${step3.spaceType}. Ensure the lighting and scale feel appropriate for this functional area.
+        ${anglePrompt}
 
-        3. SaaS PROMPTS (KEYWORD CONSTRAINTS): 
-           - Details to emphasize or preserve: ${step3.obstacles.join(', ') || 'standard architectural features'}.
+        ${floorDesc}
 
-        [CRITICAL COLOR INTEGRITY]
-        - Image 1 defines the room geometry.
-        - Image 2 (if present) is the MASTER SOURCE for the floor material which must be replicated 1:1 in terms of chroma and texture.
-        - DO NOT allow room lighting to shift the material's basic color balance.
-
-        QUALITY: Photorealistic, cinematic lighting, 8k resolution.`;
+        ENVIRONMENT: ${step3.lighting} light. Preserve original room color temperature while applying the new floor.
+        QUALITY: Photorealistic, 8k, physically accurate render.`;
 
         const renderParts: any[] = [];
         if (roomImgBase64) {
@@ -682,10 +620,9 @@ export default function App() {
         }
         renderParts.push({ text: renderPrompt });
 
-        const aiResponse = await aiProxy('gemini-3.1-flash-image-preview', { 
+        const aiResponse = await aiProxy('gemini-3.1-flash-image-preview', {
           contents: [{ parts: renderParts }],
           config: {
-            temperature: 0.8,
             imageConfig: {
               aspectRatio: aspect,
             }
@@ -715,10 +652,9 @@ export default function App() {
       // --- SaaS 3: Consume ---
       if (saas.userId && saas.toolId && newResults.length > 0) {
         try {
-          const consumeRes = await axios.post(getApiUrl('/api/tool/consume'), {
+          const consumeRes = await axios.post('/api/tool/consume', {
             userId: saas.userId,
-            toolId: saas.toolId,
-            requestId: Math.random().toString(36).substring(2) + Date.now().toString(36)
+            toolId: saas.toolId
           });
           if (consumeRes.data.success) {
             setSaas(prev => ({
