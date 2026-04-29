@@ -381,8 +381,8 @@ export default function App() {
 
       const response = await aiProxy("gemini-3-flash-preview", {
         contents: [
-          { text: prompt },
-          { inlineData: { mimeType: file.type, data: pureBase64 } }
+          { parts: [{ text: prompt }] },
+          { parts: [{ inlineData: { mimeType: file.type, data: pureBase64 } }] }
         ],
         config: {
           responseMimeType: "application/json",
@@ -437,8 +437,8 @@ export default function App() {
 
       const response = await aiProxy("gemini-3-flash-preview", {
         contents: [
-          { text: prompt },
-          { inlineData: { mimeType: file.type, data: pureBase64 } }
+          { parts: [{ text: prompt }] },
+          { parts: [{ inlineData: { mimeType: file.type, data: pureBase64 } }] }
         ],
         config: {
           responseMimeType: "application/json",
@@ -487,8 +487,8 @@ export default function App() {
 
       const response = await aiProxy("gemini-3-flash-preview", {
         contents: [
-          { text: prompt },
-          { inlineData: { mimeType: "image/png", data: pureBase64 } }
+          { parts: [{ text: prompt }] },
+          { parts: [{ inlineData: { mimeType: "image/png", data: pureBase64 } }] }
         ],
         config: {
           responseMimeType: "application/json",

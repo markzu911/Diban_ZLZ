@@ -59,15 +59,36 @@ async function startServer() {
   app.post("/api/gemini", async (req, res) => {
     try {
       const { model, payload } = req.body;
-      console.log(`AI request for model: ${model}`);
-      const response = await ai.models.generateContent({
-        model,
-        ...payload
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error("GEMINI_API_KEY is not configured in the environment.");
+      }
+      
+      console.log(`[AI] Request for model: ${model}`);
+      const generativeModel = ai.getGenerativeModel({ model });
+      
+      // Extract contents and generationConfig from payload
+      const { contents, config, ...rest } = payload;
+      
+      const result = await generativeModel.generateContent({
+        contents,
+        generationConfig: config,
+        ...rest
       });
-      res.json(response);
+
+      const response = await result.response;
+      const text = response.text();
+      
+      // Return both the raw response and the extracted text for convenience
+      res.json({
+        ...response,
+        text: text
+      });
     } catch (error: any) {
-      console.error("Gemini Proxy Error:", error.message);
-      res.status(500).json({ error: error.message });
+      console.error("[AI Error]:", error.message);
+      res.status(500).json({ 
+        error: error.message,
+        details: "AI generation failed on the server."
+      });
     }
   });
 
