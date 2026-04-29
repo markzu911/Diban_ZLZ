@@ -82,17 +82,22 @@ async function startServer() {
 
   // Generic Gemini API Proxy - handling /api/gemini correctly
   const handleGeminiRequest = async (req: express.Request, res: express.Response) => {
-    console.log(`[AI] Incoming request to ${req.url}`);
+    const start = Date.now();
+    console.log(`[AI Request] ${req.method} ${req.url}`);
     try {
-      const { model, payload } = req.body;
-      if (!process.env.GEMINI_API_KEY) {
-        console.error("[AI Error] Missing GEMINI_API_KEY");
-        return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.error("[AI Error] GEMINI_API_KEY is not defined in environment");
+        return res.status(500).json({ error: "GEMINI_API_KEY missing on server" });
       }
+
+      const { model, payload } = req.body;
+      const targetModel = model || "gemini-3-flash-preview";
       
-      console.log(`[AI] Processing for model: ${model}`);
+      console.log(`[AI] Model: ${targetModel}, Payload Size: ${JSON.stringify(payload).length} bytes`);
+      
       const generativeModel = ai.getGenerativeModel({ 
-        model: model || "gemini-1.5-flash", 
+        model: targetModel, 
       });
       
       // Ensure specific structure for contents

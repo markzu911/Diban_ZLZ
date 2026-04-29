@@ -32,9 +32,17 @@ const Type = {
 } as const;
 
 // Helper for backend AI calls
+const getApiUrl = (path: string) => {
+  // Ensure we hit the app's own origin even if embedded
+  const base = typeof window !== 'undefined' ? window.location.origin : '';
+  return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 const aiProxy = async (model: string, payload: any) => {
+  const url = getApiUrl('/api/gemini');
+  console.log(`[AI] Calling Proxy: ${url} (model: ${model})`);
   try {
-    const res = await axios.post('/api/gemini', { model, payload }, {
+    const res = await axios.post(url, { model, payload }, {
       timeout: 60000 // 60s timeout for AI
     });
     return res.data;
@@ -316,7 +324,7 @@ export default function App() {
     const launchTool = async () => {
       if (saas.userId && saas.toolId && !saas.initialized) {
         try {
-          const response = await axios.post('/api/tool/launch', {
+          const response = await axios.post(getApiUrl('/api/tool/launch'), {
             userId: saas.userId,
             toolId: saas.toolId
           });
@@ -424,12 +432,13 @@ export default function App() {
       5. Furniture/Obstacles to preserve.
       Return JSON format: {spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
 
-      const response = await aiProxy("gemini-1.5-flash", { 
+      const response = await aiProxy("gemini-3-flash-preview", { 
         contents: [
           { parts: [{ text: prompt }] },
           { parts: [{ inlineData: { mimeType: "image/jpeg", data: pureBase64 } }] }
         ],
         config: {
+          temperature: 0.4,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -480,12 +489,13 @@ export default function App() {
       6. Finish/Surface (e.g. "matte", "glossy", "brushed", "satin")
       Return JSON: { materialName, shape, pattern, texture, relief, finish }`;
 
-      const response = await aiProxy("gemini-1.5-flash", { 
+      const response = await aiProxy("gemini-3-flash-preview", { 
         contents: [
           { parts: [{ text: prompt }] },
           { parts: [{ inlineData: { mimeType: "image/jpeg", data: pureBase64 } }] }
         ],
         config: {
+          temperature: 0.4,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -530,12 +540,13 @@ export default function App() {
         details: { color: string, shape: string, pattern: string, texture: string, relief: string, finish: string } 
       }`;
 
-      const response = await aiProxy("gemini-1.5-flash", { 
+      const response = await aiProxy("gemini-3-flash-preview", { 
         contents: [
           { parts: [{ text: prompt }] },
           { parts: [{ inlineData: { mimeType: "image/jpeg", data: pureBase64 } }] }
         ],
         config: {
+          temperature: 0.7,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -583,7 +594,7 @@ export default function App() {
     if (saas.userId && saas.toolId) {
       setSaas(prev => ({ ...prev, isVerifying: true, insufficientPoints: false }));
       try {
-        const verifyRes = await axios.post('/api/tool/verify', {
+        const verifyRes = await axios.post(getApiUrl('/api/tool/verify'), {
           userId: saas.userId,
           toolId: saas.toolId
         });
@@ -671,9 +682,10 @@ export default function App() {
         }
         renderParts.push({ text: renderPrompt });
 
-        const aiResponse = await aiProxy('gemini-1.5-flash', { 
+        const aiResponse = await aiProxy('gemini-3.1-flash-image-preview', { 
           contents: [{ parts: renderParts }],
           config: {
+            temperature: 0.8,
             imageConfig: {
               aspectRatio: aspect,
             }
@@ -703,7 +715,7 @@ export default function App() {
       // --- SaaS 3: Consume ---
       if (saas.userId && saas.toolId && newResults.length > 0) {
         try {
-          const consumeRes = await axios.post('/api/tool/consume', {
+          const consumeRes = await axios.post(getApiUrl('/api/tool/consume'), {
             userId: saas.userId,
             toolId: saas.toolId,
             requestId: Math.random().toString(36).substring(2) + Date.now().toString(36)
