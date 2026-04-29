@@ -4,6 +4,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,8 +80,8 @@ async function startServer() {
   app.post("/api/tool/consume", (req, res) => proxyRequest(req, res, "/api/tool/consume"));
 
   // Generic Gemini API Proxy - handling /api/gemini correctly
-  app.post("/api/gemini", async (req, res) => {
-    console.log(`[AI] Incoming request to /api/gemini`);
+  const handleGeminiRequest = async (req: express.Request, res: express.Response) => {
+    console.log(`[AI] Incoming request to ${req.url}`);
     try {
       const { model, payload } = req.body;
       if (!process.env.GEMINI_API_KEY) {
@@ -86,7 +90,7 @@ async function startServer() {
       }
       
       console.log(`[AI] Processing for model: ${model}`);
-      const generativeModel = ai.getGenerativeModel({ model });
+      const generativeModel = ai.getGenerativeModel({ model: model || "gemini-3-flash-preview" });
       
       const { contents, config, ...rest } = payload;
       
@@ -111,13 +115,23 @@ async function startServer() {
         details: "AI generation failed on the server."
       });
     }
-  });
+  };
 
-  // Alias for /api/generate if needed by best practices
-  app.post("/api/generate", (req, res) => {
-    // This could combine verify + generate + consume in one go for higher security
-    // For now, redirecting to /api/gemini to maintain compatibility
-    res.redirect(307, '/api/gemini');
+  app.post("/api/gemini", handleGeminiRequest);
+  app.post("/api/gemini/", handleGeminiRequest);
+  app.post("/api/generate", handleGeminiRequest);
+  app.post("/api/generate/", handleGeminiRequest);
+  app.post("/gemini", handleGeminiRequest); // In case /api prefix is stripped by proxy
+  app.post("/generate", handleGeminiRequest);
+
+  // Fallback for any other API routes to help debug 404s
+  app.all("/api/*", (req, res) => {
+    console.warn(`[404] Unhandled API Request: ${req.method} ${req.url}`);
+    res.status(404).json({ 
+      error: "API route not found", 
+      path: req.url,
+      method: req.method 
+    });
   });
 
   // Vite middleware for development
