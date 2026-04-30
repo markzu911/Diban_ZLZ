@@ -36,17 +36,14 @@ export const callGemini = async (parameters: any) => {
     // Often components do: const text = response.response.text();
     // In our REST response, it's data.candidates[0].content.parts[0].text
     
+    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    
     const enhancedResponse = {
        ...data,
+       text: textContent, // Direct access used by App.tsx line 400
        response: {
            ...data,
-           text: () => {
-               try {
-                   return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-               } catch (e) {
-                   return "";
-               }
-           }
+           text: () => textContent
        }
     };
 
