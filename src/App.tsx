@@ -26,6 +26,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Type } from "@google/genai";
 import { callGemini } from './lib/gemini';
 
+import { resizeImage } from './lib/image-utils';
+
 // --- Types ---
 
 type AspectRatio = '1:1' | '3:4' | '4:3' | '16:9';
@@ -338,14 +340,20 @@ export default function App() {
 
   const [customFurniture, setCustomFurniture] = useState('');
 
-  // --- Helper: File to Base64 ---
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
+  // --- Helper: File to Base64 (with resizing to prevent 413) ---
+  const fileToBase64 = async (file: File): Promise<string> => {
+    try {
+      // Limit to 1280px (approx 720p - 1080p area) to stay under 1MB proxy limits
+      return await resizeImage(file, 1280);
+    } catch (error) {
+      console.error("Resize failed, falling back to original", error);
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+      });
+    }
   };
 
   // --- Step 1: Analysis ---
