@@ -12,7 +12,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '50mb' }));
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
   // Middleware to adapt Express req/res to Vercel handler
   app.all("/api/*", async (req, res) => {

@@ -35,7 +35,7 @@ export default async function handler(req: any, res: any) {
       const modelId = model.startsWith("models/") ? model : `models/${model}`;
       const targetUrl = `https://generativelanguage.googleapis.com/v1beta/${modelId}:generateContent?key=${apiKey}`;
 
-      console.log(`Forwarding Gemini request to: ${modelId}`);
+      console.log(`Forwarding Gemini request to: ${modelId}, payload size: ${JSON.stringify(payload).length}`);
 
       const response = await axios({
         method: "POST",
@@ -44,6 +44,8 @@ export default async function handler(req: any, res: any) {
         headers: {
           "Content-Type": "application/json",
         },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
       });
 
       // Extract text content for easier frontend usage if desired, 
