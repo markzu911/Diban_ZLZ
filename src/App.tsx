@@ -28,6 +28,8 @@ import { callGemini } from './lib/gemini';
 
 import { resizeImage } from './lib/image-utils';
 
+import { persistResultImage } from './lib/upload';
+
 // --- Types ---
 
 type AspectRatio = '1:1' | '3:4' | '4:3' | '16:9';
@@ -650,13 +652,14 @@ export default function App() {
         }
       }
 
-      // --- SaaS 3: Consume ---
+      // --- SaaS 3: Consume & Persist ---
       if (saas.userId && saas.toolId && newResults.length > 0) {
         try {
           const consumeRes = await axios.post('/api/tool/consume', {
             userId: saas.userId,
             toolId: saas.toolId
           });
+          
           if (consumeRes.data.success) {
             setSaas(prev => ({
               ...prev,
@@ -665,9 +668,14 @@ export default function App() {
                 integral: consumeRes.data.data.currentIntegral
               } : null
             }));
+
+            // Persist the results to SaaS UserImage table
+            for (const result of newResults) {
+              await persistResultImage(saas.userId, saas.toolId, result.img);
+            }
           }
         } catch (error) {
-          console.error("SaaS Consume Error:", error);
+          console.error("SaaS Consume/Persist Error:", error);
         }
       }
 

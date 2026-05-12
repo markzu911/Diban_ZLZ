@@ -53,15 +53,15 @@ export default async function handler(req: any, res: any) {
       return res.status(response.status).json(response.data);
     }
 
-    // 2. Handle Tool Proxying
-    if (normalizedUrl.includes("/api/tool/")) {
-      const toolSubPath = reqUrl.split(/\/api\/tool\//i)[1];
-      if (!toolSubPath) {
-          return res.status(404).json({ error: "Tool Path Missing" });
-      }
-      const targetUrl = `http://aibigtree.com/api/tool/${toolSubPath}`;
+    // 2. Handle SaaS API Proxy (Launch, Verify, Consume, Upload)
+    const saasEndpoints = ["/api/tool/", "/api/upload/"];
+    const matchedEndpoint = saasEndpoints.find(ep => normalizedUrl.includes(ep));
+
+    if (matchedEndpoint) {
+      const restPath = reqUrl.split(matchedEndpoint)[1];
+      const targetUrl = `http://aibigtree.com${matchedEndpoint}${restPath}`;
       
-      console.log(`Forwarding to: ${targetUrl}`);
+      console.log(`Forwarding SaaS request to: ${targetUrl}`);
 
       const response = await axios({
         method: method,
@@ -70,6 +70,9 @@ export default async function handler(req: any, res: any) {
         headers: {
           "Content-Type": "application/json",
         },
+        timeout: 60000, // Extend timeout for uploads
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
       });
 
       return res.status(response.status).json(response.data);
