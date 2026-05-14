@@ -28,9 +28,17 @@ import { callGemini } from './lib/gemini';
 
 import { resizeImage } from './lib/image-utils';
 
-import { persistResultImage } from './lib/upload';
+import { persistResultImage, getDirectUploadToken, commitUpload } from './lib/upload';
 
 // --- Types ---
+
+interface GalleryImage {
+  id: string;
+  url: string;
+  fileName: string;
+  fileSize: number;
+  createdAt: string;
+}
 
 type AspectRatio = '1:1' | '3:4' | '4:3' | '16:9';
 type Quality = '1K' | '2K' | '4K';
@@ -201,6 +209,120 @@ const SelectField = ({ label, icon: Icon, value, options, onChange }: { label: s
   </div>
 );
 
+const Gallery = ({ userId, role, onClose }: { userId: string, role: number, onClose: () => void }) => {
+  const [images, setImages] = useState<GalleryImage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const fetchImages = async () => {
+    setIsLoading(true);
+    try {
+      const res = await axios.get(`/api/upload/image?userId=${userId}&role=${role}`);
+      if (res.data.success) {
+        setImages(res.data.data);
+      }
+    } catch (error) {
+      console.error("Gallery fetch error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteImage = async (id: string) => {
+    if (!window.confirm("确定要删除这张图片吗？")) return;
+    try {
+      const res = await axios.delete(`/api/upload/image`, {
+        data: { id, userId, role }
+      });
+      if (res.data.success) {
+        setImages(prev => prev.filter(img => img.id !== id));
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchImages();
+  }, []);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      className="fixed inset-0 z-[60] bg-white pt-20 overflow-y-auto"
+    >
+      <div className="max-w-7xl mx-auto px-6 pb-20">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tighter">我的图片库</h2>
+            <p className="text-gray-400 text-sm font-medium mt-1 uppercase tracking-widest">历史生成的渲染结果</p>
+          </div>
+          <button 
+            onClick={onClose}
+            className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="h-[400px] flex flex-col items-center justify-center gap-4">
+            <Loader2 className="w-12 h-12 text-[#5B50FF] animate-spin" />
+            <span className="text-sm font-black text-gray-300 uppercase tracking-widest">正在同步云端数据</span>
+          </div>
+        ) : images.length === 0 ? (
+          <div className="h-[400px] flex flex-col items-center justify-center gap-6 bg-gray-50/50 rounded-[40px] border-2 border-dashed border-gray-100">
+            <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-sm">
+              <ImageIcon className="w-10 h-10 text-gray-200" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-gray-400 mb-1">图片库空空如也</h3>
+              <p className="text-gray-300 text-sm font-medium uppercase italic">快去开启你的第一场渲染之旅吧</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {images.map((img) => (
+              <motion.div 
+                key={img.id}
+                layoutId={img.id}
+                className="group relative bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all"
+              >
+                <div className="aspect-[3/4] relative">
+                  <img src={img.url} className="w-full h-full object-cover" alt="Gallery" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
+                    <button 
+                      onClick={() => setPreview(img.url)}
+                      className="bg-white/20 hover:bg-white/30 backdrop-blur-md p-3 rounded-2xl text-white transition-all transform translate-y-4 group-hover:translate-y-0"
+                    >
+                      <Maximize2 className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => deleteImage(img.id)}
+                      className="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-md p-3 rounded-2xl text-red-100 transition-all transform translate-y-4 group-hover:translate-y-0 delay-75"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="p-4 border-t border-gray-50">
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{new Date(img.createdAt).toLocaleDateString()}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {preview && <PreviewModal img={preview} onClose={() => setPreview(null)} />}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
 const DisplayField = ({ label, icon: Icon, value }: { label: string, icon: any, value: string }) => (
   <div className="space-y-2">
     <label className="flex items-center gap-2 text-gray-400 text-[10px] uppercase tracking-widest font-black ml-1">
@@ -331,6 +453,7 @@ export default function App() {
   const [angles, setAngles] = useState<ViewAngle[]>(['对角线']);
   const [history, setHistory] = useState<RenderResult[]>([]);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
+  const [showGallery, setShowGallery] = useState(false);
 
   const toggleAngle = (v: ViewAngle) => {
     setAngles(prev => 
@@ -710,6 +833,14 @@ export default function App() {
                 <h4 className="text-sm font-black text-gray-900 leading-tight tracking-tight uppercase italic">{saas.user.name}</h4>
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{saas.user.enterprise}</p>
               </div>
+              <div className="h-8 w-px bg-gray-100 mx-2" />
+              <button 
+                onClick={() => setShowGallery(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-[#5B50FF]/5 rounded-xl transition-all group"
+              >
+                <Layers className="w-4 h-4 text-gray-400 group-hover:text-[#5B50FF]" />
+                <span className="text-[11px] font-black text-gray-400 group-hover:text-gray-900 uppercase tracking-widest">作品库</span>
+              </button>
             </div>
             
             <div className="flex items-center gap-6">
@@ -1084,6 +1215,16 @@ export default function App() {
             )}
           </div>
         </section>
+
+        <AnimatePresence>
+          {showGallery && saas.userId && (
+            <Gallery 
+              userId={saas.userId} 
+              role={(saas.user as any)?.role || 1} 
+              onClose={() => setShowGallery(false)} 
+            />
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {previewImg && <PreviewModal img={previewImg} onClose={() => setPreviewImg(null)} />}
