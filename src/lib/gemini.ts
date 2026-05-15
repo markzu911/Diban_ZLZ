@@ -38,7 +38,10 @@ export const callGemini = async (parameters: any) => {
         payload.generationConfig = generationConfig;
       }
       if (imageConfig) {
-        payload.imageGenerationConfig = imageConfig;
+        payload.image_generation_config = {
+          aspect_ratio: imageConfig.aspectRatio,
+          image_size: imageConfig.imageSize,
+        };
       }
     }
 
