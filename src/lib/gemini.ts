@@ -38,7 +38,7 @@ export const callGemini = async (parameters: any) => {
         payload.generationConfig = generationConfig;
       }
       if (imageConfig) {
-        payload.imageConfig = imageConfig;
+        payload.imageGenerationConfig = imageConfig;
       }
     }
 

@@ -755,9 +755,11 @@ export default function App() {
         const aiResponse = await callGemini({
           model: 'gemini-3.1-flash-image-preview',
           contents: { parts: renderParts },
-          imageConfig: {
-            aspectRatio: aspect,
-            imageSize: quality,
+          config: {
+            imageConfig: {
+              aspectRatio: aspect,
+              imageSize: quality,
+            }
           }
         });
 
