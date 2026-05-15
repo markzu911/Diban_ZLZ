@@ -6,26 +6,60 @@ export const callGemini = async (parameters: any) => {
   try {
     const { model, contents, config, ...rest } = parameters;
     
+    // Normalize contents to the format expected by the Gemini REST API: Array<{ role?: string, parts: Array<{ text?: string, inlineData?: any }> }>
+    let normalizedContents: any[] = [];
+    if (typeof contents === "string") {
+      normalizedContents = [{ parts: [{ text: contents }] }];
+    } else if (Array.isArray(contents)) {
+      normalizedContents = contents.map(c => {
+        if (c.parts) return c;
+        if (Array.isArray(c)) return { parts: c };
+        return { parts: [c] };
+      });
+    } else if (contents && typeof contents === "object") {
+      if (contents.parts) {
+        normalizedContents = [contents];
+      } else {
+        // Single part object
+        normalizedContents = [{ parts: [contents] }];
+      }
+    }
+
+    // Map configuration: generic config goes to generationConfig, specialized configs (like imageConfig) are top-level
+    // The SDK often puts imageConfig inside config, but REST expects it at the top level
+    const payload: any = {
+      contents: normalizedContents,
+      ...rest
+    };
+
+    if (config) {
+      const { imageConfig, ...generationConfig } = config;
+      if (Object.keys(generationConfig).length > 0) {
+        payload.generationConfig = generationConfig;
+      }
+      if (imageConfig) {
+        payload.imageConfig = imageConfig;
+      }
+    }
+
     // The proxy expects { model, payload }
-    // We map contents and config into the payload the Gemini API expects
     const res = await fetch("/api/gemini", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: model || "gemini-1.5-flash",
-        payload: {
-          contents: contents,
-          generationConfig: config,
-          ...rest
-        }
+        model: model || "gemini-3-flash-preview",
+        payload
       }),
     });
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || `Proxy request failed with status ${res.status}`);
+      const errorMessage = typeof errorData.error === 'object' 
+        ? (errorData.error.message || JSON.stringify(errorData.error))
+        : (errorData.error || `Proxy request failed with status ${res.status}`);
+      throw new Error(errorMessage);
     }
 
     const data = await res.json();
