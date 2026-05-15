@@ -468,9 +468,8 @@ export default function App() {
   // --- Helper: File to Base64 (with resizing to prevent 413) ---
   const fileToBase64 = async (file: File): Promise<string> => {
     try {
-      // Allow higher resolution input for 4K quality
-      const maxDimension = quality === '4K' ? 2048 : 1280;
-      return await resizeImage(file, maxDimension);
+      // Limit to 1280px (approx 720p - 1080p area) to stay under 1MB proxy limits
+      return await resizeImage(file, 1280);
     } catch (error) {
       console.error("Resize failed, falling back to original", error);
       return new Promise((resolve, reject) => {
@@ -720,12 +719,6 @@ export default function App() {
         - Shape & Pattern: ${step3.floorDetails?.shape || 'Standard'} with ${step3.floorDetails?.pattern || 'Seamless'} layout.
         - Surface Detail: Match the physical relief/bumps (${step3.floorDetails?.relief || 'High-fidelity'}) and sheen (${step3.floorDetails?.finish || 'Natural'}) precisely.`;
 
-        const qualityPrompt = quality === '4K' 
-          ? " [ULTRA HIGH DEFINITION 4K: Maximum pixel density, extreme texture fidelity, cinematic depth of field, 8k resolution standards.]"
-          : quality === '2K'
-          ? " [HIGH DEFINITION 2K: Sharp details, high texture quality.]"
-          : " [STANDARD DEFINITION: Good quality for quick preview.]";
-
         const renderPrompt = `TASK: PRECISION ARCHITECTURAL FLOOR REPLACEMENT
         
         CRITICAL COLOR RULE: The output floor MUST match the exact chroma, saturation, and hue of the target material from Image 2. 
@@ -741,7 +734,7 @@ export default function App() {
         ${floorDesc}
 
         ENVIRONMENT: ${step3.lighting} light. Preserve original room color temperature while applying the new floor.
-        QUALITY: ${qualityPrompt} Photorealistic, physically accurate professional render.`;
+        QUALITY: Photorealistic, 8k, physically accurate render.`;
 
         const renderParts: any[] = [];
         if (roomImgBase64) {
@@ -758,7 +751,6 @@ export default function App() {
           config: {
             imageConfig: {
               aspectRatio: aspect,
-              imageSize: quality,
             }
           }
         });

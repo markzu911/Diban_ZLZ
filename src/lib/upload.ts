@@ -12,8 +12,6 @@ export interface UploadResult {
   headers?: Record<string, string>;
   message?: string;
   savedToRecords?: boolean;
-  readUrl?: string;
-  publicUrl?: string;
 }
 
 /**
