@@ -1332,13 +1332,6 @@ export default function App() {
                   <Card title="视频生成配置" icon={<VideoIcon className="w-4 h-4 text-[#5B50FF]" />}>
                     <div className="space-y-6">
                       <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block italic">镜头拍摄提示词</label>
-                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-[11px] font-medium leading-relaxed text-gray-600 italic">
-                          {videoPromptBase}
-                        </div>
-                      </div>
-
-                      <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block italic">选择参考图 (History)</label>
                         <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
                           {history.map((h) => (
@@ -1406,16 +1399,43 @@ export default function App() {
                   <div className="bg-white rounded-[40px] border border-gray-100 shadow-xl overflow-hidden aspect-video relative flex flex-col items-center justify-center group">
                     <AnimatePresence mode="wait">
                       {videoResult ? (
-                        <motion.video
+                        <motion.div
                           key={videoResult}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          src={videoResult}
-                          controls
-                          autoPlay
-                          loop
-                          className="w-full h-full object-cover"
-                        />
+                          className="w-full h-full"
+                        >
+                          <video
+                            src={videoResult}
+                            controls
+                            autoPlay
+                            loop
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-6 right-6 flex gap-3 z-10">
+                            <button
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = videoResult;
+                                link.download = `floor_render_${Date.now()}.mp4`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="h-12 px-6 bg-white/90 backdrop-blur rounded-2xl flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-900 shadow-xl hover:bg-white transition-all pointer-events-auto"
+                            >
+                              <Download className="w-4 h-4" />
+                              下载 4K 视频
+                            </button>
+                            <button
+                              onClick={() => setVideoResult(null)}
+                              className="w-12 h-12 bg-white/90 backdrop-blur rounded-2xl flex items-center justify-center text-gray-900 shadow-xl hover:bg-white transition-all pointer-events-auto"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </motion.div>
                       ) : isVideoGenerating ? (
                         <motion.div 
                           key="loading"
@@ -1449,21 +1469,6 @@ export default function App() {
                         </motion.div>
                       )}
                     </AnimatePresence>
-
-                    {videoResult && (
-                      <div className="absolute bottom-8 right-8 flex gap-3">
-                         <button className="h-12 px-6 bg-white/90 backdrop-blur rounded-2xl flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-900 shadow-xl hover:bg-white transition-all">
-                           <Download className="w-4 h-4" />
-                           下载 4K 视频
-                         </button>
-                         <button
-                           onClick={() => setVideoResult(null)}
-                           className="w-12 h-12 bg-white/90 backdrop-blur rounded-2xl flex items-center justify-center text-gray-900 shadow-xl hover:bg-white transition-all"
-                         >
-                           <X className="w-5 h-5" />
-                         </button>
-                      </div>
-                    )}
                   </div>
 
                   <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
