@@ -100,8 +100,14 @@ const PreviewModal = ({ img, onClose }: { img: string, onClose: () => void }) =>
   </motion.div>
 );
 
-const Card = ({ children, className = "" }: { children: ReactNode, className?: string }) => (
+const Card = ({ children, className = "", title, icon }: { children: ReactNode, className?: string, title?: string, icon?: ReactNode }) => (
   <div className={`bg-white rounded-[24px] border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-8 ${className}`}>
+    {(title || icon) && (
+      <div className="flex items-center gap-3 mb-6">
+        {icon && <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center">{icon}</div>}
+        {title && <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest italic">{title}</h3>}
+      </div>
+    )}
     {children}
   </div>
 );
@@ -463,17 +469,67 @@ export default function App() {
   const [selectedVideoSourceId, setSelectedVideoSourceId] = useState<string | null>(null);
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
   const [videoResult, setVideoResult] = useState<string | null>(null);
+  const [videoResolution, setVideoResolution] = useState('1080p');
+  const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
   const videoPromptBase = "高端家居电商视频，基于参考图像生成。镜头以稳定轨道运动缓慢环绕房间，地板在移动光线下呈现微妙反光变化。色调温暖自然，对比度适中，突出地板的高级质感。画面构图留白合理，电影级商品摄影。";
 
-  const handleGenerateVideo = () => {
+  const handleGenerateVideo = async () => {
     if (!selectedVideoSourceId) return;
+    const selectedSource = history.find(h => h.id === selectedVideoSourceId);
+    if (!selectedSource) return;
+
     setIsVideoGenerating(true);
-    // Simulate generation delay
-    setTimeout(() => {
+    setVideoResult(null);
+    
+    try {
+      const startRes = await fetch("/api/video/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          prompt: videoPromptBase,
+          imageUrl: selectedSource.img,
+          resolution: videoResolution,
+          aspectRatio: videoAspectRatio
+        }),
+      });
+      const { operationName, error: startError } = await startRes.json();
+      if (startError) throw new Error(startError);
+
+      const poll = async () => {
+        try {
+          const statusRes = await fetch("/api/video/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ operationName }),
+          });
+          const { done, error: pollError } = await statusRes.json();
+          if (pollError) throw new Error(pollError.message || "Polling failed");
+          
+          if (done) {
+            const downloadRes = await fetch("/api/video/download", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ operationName }),
+            });
+            if (!downloadRes.ok) throw new Error("Download failed");
+            const blob = await downloadRes.blob();
+            const videoUrl = URL.createObjectURL(blob);
+            setVideoResult(videoUrl);
+            setIsVideoGenerating(false);
+          } else {
+            setTimeout(poll, 5000);
+          }
+        } catch (pollErr: any) {
+          console.error("Poll cycle error:", pollErr);
+          setIsVideoGenerating(false);
+        }
+      };
+
+      poll();
+    } catch (err: any) {
+      console.error("Video Gen Initial Error:", err);
       setIsVideoGenerating(false);
-      // Placeholder video for demo
-      setVideoResult("https://assets.mixkit.co/videos/preview/mixkit-bright-kitchen-with-a-natural-vibe-40328-large.mp4");
-    }, 5000);
+    }
   };
 
   const toggleAngle = (v: ViewAngle) => {
@@ -1332,105 +1388,134 @@ export default function App() {
                   <Card title="视频生成配置" icon={<VideoIcon className="w-4 h-4 text-[#5B50FF]" />}>
                     <div className="space-y-6">
                       <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block italic">选择参考图 (History)</label>
-                        <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 block italic">选择参考图 (History)</label>
+                        <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
                           {history.map((h) => (
                             <button
                               key={h.id}
                               onClick={() => setSelectedVideoSourceId(h.id)}
-                              className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                              className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all ${
                                 selectedVideoSourceId === h.id ? 'border-[#5B50FF] shadow-lg shadow-[#5B50FF]/20 scale-[0.98]' : 'border-transparent opacity-60 hover:opacity-100'
                               }`}
                             >
                               <img src={h.img} alt="Ref" className="w-full h-full object-cover" />
                               {selectedVideoSourceId === h.id && (
-                                <div className="absolute inset-0 bg-[#5B50FF]/20 flex items-center justify-center">
-                                  <CheckCircle2 className="w-5 h-5 text-white" />
+                                <div className="absolute inset-0 bg-[#5B50FF]/20 flex items-center justify-center backdrop-blur-[2px]">
+                                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-xl">
+                                    <CheckCircle2 className="w-6 h-6 text-[#5B50FF]" />
+                                  </div>
                                 </div>
                               )}
                             </button>
                           ))}
                           {history.length === 0 && (
-                            <div className="col-span-2 py-10 flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-xl">
-                              <ImageIcon className="w-6 h-6 text-gray-200 mb-2" />
-                              <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">请先生成效果图</span>
+                            <div className="col-span-2 py-16 flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-3xl">
+                              <ImageIcon className="w-8 h-8 text-gray-200 mb-3" />
+                              <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">请先在「效果图生成」中创建作品</span>
                             </div>
                           )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block italic">输出分辨率</label>
+                          <div className="flex gap-2">
+                            {['720p', '1080p'].map(res => (
+                              <button
+                                key={res}
+                                onClick={() => setVideoResolution(res)}
+                                className={`flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                                  videoResolution === res 
+                                    ? 'bg-[#5B50FF] text-white shadow-lg shadow-[#5B50FF]/20' 
+                                    : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                                }`}
+                              >
+                                {res}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block italic">画幅比例</label>
+                          <div className="flex gap-2">
+                            {['16:9', '9:16', '1:1'].map(ratio => (
+                              <button
+                                key={ratio}
+                                onClick={() => setVideoAspectRatio(ratio)}
+                                className={`flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                                  videoAspectRatio === ratio 
+                                    ? 'bg-[#5B50FF] text-white shadow-lg shadow-[#5B50FF]/20' 
+                                    : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                                }`}
+                              >
+                                {ratio}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
 
                       <button
                         onClick={handleGenerateVideo}
                         disabled={isVideoGenerating || !selectedVideoSourceId}
-                        className="w-full h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center gap-3 font-black italic uppercase text-xs tracking-widest hover:bg-[#0A0D18] transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                        className="w-full h-16 bg-gray-900 text-white rounded-2xl flex items-center justify-center gap-3 font-black italic uppercase text-xs tracking-widest hover:bg-[#0A0D18] transition-all disabled:opacity-50 disabled:cursor-not-allowed group shadow-xl"
                       >
                         {isVideoGenerating ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-[#5B50FF]" />
+                          <div className="flex items-center gap-2">
+                             <Loader2 className="w-4 h-4 animate-spin text-[#5B50FF]" />
+                             <span className="animate-pulse">正在提取图像特征...</span>
+                          </div>
                         ) : (
-                          <Sparkles className="w-4 h-4 text-[#5B50FF] group-hover:animate-pulse" />
+                          <>
+                            <Sparkles className="w-4 h-4 text-[#5B50FF] group-hover:animate-bounce" />
+                            启动视频演练生成
+                          </>
                         )}
-                        {isVideoGenerating ? '时空渲染加速中...' : '启动视频演练生成'}
                       </button>
                     </div>
                   </Card>
-
-                  <div className="p-6 bg-white rounded-[32px] border border-gray-100 shadow-sm">
-                    <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                       <span className="w-1 h-1 bg-[#5B50FF] rounded-full" />
-                       渲染演进参数
-                    </h4>
-                    <div className="space-y-4">
-                      {[
-                        { label: '帧率控制', val: '60 FPS (Cinema)' },
-                        { label: '时空稠密度', val: '1.2x Enhanced' },
-                        { label: '反光追踪', val: 'Raytraced High' }
-                      ].map(item => (
-                        <div key={item.label} className="flex items-center justify-between">
-                          <span className="text-[9px] font-bold text-gray-400 uppercase">{item.label}</span>
-                          <span className="text-[9px] font-black text-gray-600 uppercase italic tracking-wider">{item.val}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
                 {/* Right: Preview Area */}
                 <div className="lg:col-span-8">
-                  <div className="bg-white rounded-[40px] border border-gray-100 shadow-xl overflow-hidden aspect-video relative flex flex-col items-center justify-center group">
+                  <div className="bg-white rounded-[40px] border border-gray-100 shadow-2xl overflow-hidden aspect-video relative flex flex-col items-center justify-center ring-1 ring-gray-100">
                     <AnimatePresence mode="wait">
                       {videoResult ? (
                         <motion.div
                           key={videoResult}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className="w-full h-full"
+                          className="w-full h-full relative"
                         >
                           <video
                             src={videoResult}
-                            controls
+                            className="w-full h-full object-cover"
                             autoPlay
                             loop
+                            muted
                             playsInline
-                            className="w-full h-full object-cover"
                           />
-                          <div className="absolute top-6 right-6 flex gap-3 z-10">
+                          <div className="absolute top-8 right-8 flex gap-4 z-20">
                             <button
                               onClick={() => {
                                 const link = document.createElement('a');
                                 link.href = videoResult;
-                                link.download = `floor_render_${Date.now()}.mp4`;
+                                link.target = '_blank';
+                                link.download = `floor_render_video_${Date.now()}.mp4`;
                                 document.body.appendChild(link);
                                 link.click();
                                 document.body.removeChild(link);
                               }}
-                              className="h-12 px-6 bg-white/90 backdrop-blur rounded-2xl flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-900 shadow-xl hover:bg-white transition-all pointer-events-auto"
+                              className="h-12 px-6 bg-white/95 backdrop-blur-md rounded-2xl flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-gray-900 shadow-2xl hover:scale-105 active:scale-95 transition-all"
                             >
-                              <Download className="w-4 h-4" />
-                              下载 4K 视频
+                              <Download className="w-4 h-4 text-[#5B50FF]" />
+                              下载演示视频
                             </button>
                             <button
                               onClick={() => setVideoResult(null)}
-                              className="w-12 h-12 bg-white/90 backdrop-blur rounded-2xl flex items-center justify-center text-gray-900 shadow-xl hover:bg-white transition-all pointer-events-auto"
+                              className="w-12 h-12 bg-white/95 backdrop-blur-md rounded-2xl flex items-center justify-center text-gray-900 shadow-2xl hover:scale-105 active:scale-95 transition-all"
                             >
                               <X className="w-5 h-5" />
                             </button>
@@ -1442,12 +1527,25 @@ export default function App() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="flex flex-col items-center gap-6"
+                          className="flex flex-col items-center gap-8"
                         >
-                          <div className="w-20 h-20 border-4 border-[#5B50FF]/10 border-t-[#5B50FF] rounded-full animate-spin" />
+                          <div className="relative">
+                            <div className="w-32 h-32 border-8 border-gray-50 rounded-full" />
+                            <div className="absolute inset-0 w-32 h-32 border-8 border-t-[#5B50FF] border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin" />
+                            <div className="absolute inset-4 overflow-hidden rounded-full">
+                               {selectedVideoSourceId && history.find(h => h.id === selectedVideoSourceId) && (
+                                 <img src={history.find(h => h.id === selectedVideoSourceId)?.img} className="w-full h-full object-cover opacity-30 grayscale animate-pulse" />
+                               )}
+                            </div>
+                          </div>
                           <div className="text-center">
-                             <p className="text-lg font-black italic text-gray-900 uppercase tracking-tight">正在构建深度时空帧...</p>
-                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] mt-2 animate-pulse">GPU Clusters Active • VEO-1 ENGINE</p>
+                             <p className="text-2xl font-black italic text-gray-900 uppercase tracking-tight">正在构建深度时空帧...</p>
+                             <div className="flex items-center justify-center gap-3 mt-3">
+                               <div className="flex gap-1">
+                                 {[1, 2, 3].map(i => <div key={i} className={`w-1.5 h-1.5 rounded-full bg-[#5B50FF] animate-bounce`} style={{ animationDelay: `${i*0.2}s` }} />)}
+                               </div>
+                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.4em]">GPU CLUSTER: VEO-1 ENGINE ACTIVE</p>
+                             </div>
                           </div>
                         </motion.div>
                       ) : (
@@ -1455,15 +1553,15 @@ export default function App() {
                           key="empty"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className="flex flex-col items-center gap-6 p-12 text-center"
+                          className="flex flex-col items-center gap-8 p-12 text-center"
                         >
-                           <div className="w-24 h-24 bg-gray-50 rounded-[32px] flex items-center justify-center text-gray-200">
-                             <VideoIcon className="w-10 h-10" />
+                           <div className="w-28 h-28 bg-[#5B50FF]/5 rounded-[40px] flex items-center justify-center text-[#5B50FF]">
+                             <VideoIcon className="w-12 h-12" />
                            </div>
                            <div>
-                             <p className="text-xl font-black italic text-gray-900 uppercase tracking-tighter">待命 - 预览监视器</p>
-                             <p className="text-sm font-medium text-gray-400 max-w-sm mt-2 leading-relaxed">
-                               请从左侧选择渲染好的 4K 效果图作为参考，系统将基于「高端家居电商」提示词生成动态漫游视频
+                             <p className="text-2xl font-black italic text-gray-900 uppercase tracking-tighter">视频演练渲染中心</p>
+                             <p className="text-sm font-medium text-gray-400 max-w-sm mt-3 leading-relaxed">
+                               基于左侧选定的 4K 效果图，系统将自动分析地板材质反光率并生成动态漫游视频
                              </p>
                            </div>
                         </motion.div>
@@ -1471,11 +1569,11 @@ export default function App() {
                     </AnimatePresence>
                   </div>
 
-                  <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {['1080P', '4K Ultra', 'H.265', 'BT.2020 Color'].map(t => (
-                      <div key={t} className="px-4 py-3 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-3 shadow-sm">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                        <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{t}</span>
+                  <div className="mt-8 flex flex-wrap gap-4">
+                    {['1080P Cinema', 'HEVC H.265', 'Raytraced Motion', 'BT.2020 HDR'].map(t => (
+                      <div key={t} className="px-6 py-3 bg-white border border-gray-100 rounded-2xl flex items-center gap-3 shadow-sm">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#5B50FF]" />
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest italic">{t}</span>
                       </div>
                     ))}
                   </div>

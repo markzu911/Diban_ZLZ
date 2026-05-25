@@ -3,7 +3,8 @@ import "dotenv/config";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
-import proxyHandler from "./api/proxy.js"; // Note: Vercel functions use JS/TS
+import proxyHandler from "./api/proxy.js";
+import { startVideoGeneration, getVideoStatus, downloadVideo } from "./api/video.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +15,11 @@ async function startServer() {
 
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ limit: '100mb', extended: true }));
+
+  // Video Generation Routes
+  app.post("/api/video/generate", startVideoGeneration);
+  app.post("/api/video/status", getVideoStatus);
+  app.post("/api/video/download", downloadVideo);
 
   // Middleware to adapt Express req/res to Vercel handler
   app.all("/api/*", async (req, res) => {

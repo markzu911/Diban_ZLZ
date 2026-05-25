@@ -6,6 +6,7 @@
   ],
   "majorCapabilities": [
     "Image Transformation",
-    "Scene Rendering"
+    "Scene Rendering",
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
 }
