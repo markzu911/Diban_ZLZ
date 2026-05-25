@@ -139,7 +139,7 @@ export const persistResultImage = async (
             return commit.url;
         }
 
-        return token.readUrl || token.publicUrl || null;
+        return commit.url || token.url || null;
     } catch (error) {
         console.error("Failed to persist result image (V6 Flow):", error);
         // Fallback to simple upload if possible, though doc discourages it

@@ -1,8 +1,8 @@
 import { useState, type ReactNode, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  Upload, 
-  Image as ImageIcon, 
+  Upload,
+  Image as ImageIcon,
   ChevronRight,
   CheckCircle2,
   Maximize2,
@@ -15,12 +15,16 @@ import {
   Search,
   Plus,
   Loader2,
-  Download,
-  Share2,
-  Layers,
-  X,
-  CreditCard,
-  AlertCircle
+  Download, 
+  Share2, 
+  Layers, 
+  X, 
+  CreditCard, 
+  AlertCircle,
+  Video as VideoIcon,
+  Menu,
+  ChevronLeft,
+  LayoutGrid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Type } from "@google/genai";
@@ -454,6 +458,23 @@ export default function App() {
   const [history, setHistory] = useState<RenderResult[]>([]);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
   const [showGallery, setShowGallery] = useState(false);
+  const [currentView, setCurrentView] = useState<'images' | 'video'>('images');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [selectedVideoSourceId, setSelectedVideoSourceId] = useState<string | null>(null);
+  const [isVideoGenerating, setIsVideoGenerating] = useState(false);
+  const [videoResult, setVideoResult] = useState<string | null>(null);
+  const videoPromptBase = "高端家居电商视频，基于参考图像生成。镜头以稳定轨道运动缓慢环绕房间，地板在移动光线下呈现微妙反光变化。色调温暖自然，对比度适中，突出地板的高级质感。画面构图留白合理，电影级商品摄影。";
+
+  const handleGenerateVideo = () => {
+    if (!selectedVideoSourceId) return;
+    setIsVideoGenerating(true);
+    // Simulate generation delay
+    setTimeout(() => {
+      setIsVideoGenerating(false);
+      // Placeholder video for demo
+      setVideoResult("https://assets.mixkit.co/videos/preview/mixkit-bright-kitchen-with-a-natural-vibe-40328-large.mp4");
+    }, 5000);
+  };
 
   const toggleAngle = (v: ViewAngle) => {
     setAngles(prev => 
@@ -820,68 +841,164 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FD] font-sans text-gray-900 pb-20 selection:bg-[#5B50FF]/10">
-      {/* SaaS User Bar */}
-      {saas.initialized && saas.user && (
-        <div className="bg-white border-b border-gray-100 px-6 py-3 sticky top-0 z-50 shadow-sm backdrop-blur-md bg-white/80">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-gradient-to-tr from-[#5B50FF] to-[#8B50FF] rounded-xl flex items-center justify-center text-white font-black italic shadow-lg shadow-[#5B50FF]/20">
-                {saas.user.name.charAt(0)}
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-gray-900 leading-tight tracking-tight uppercase italic">{saas.user.name}</h4>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{saas.user.enterprise}</p>
-              </div>
-              <div className="h-8 w-px bg-gray-100 mx-2" />
-              <button 
-                onClick={() => setShowGallery(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-[#5B50FF]/5 rounded-xl transition-all group"
+    <div className="min-h-screen bg-[#F8F9FD] font-sans text-gray-900 selection:bg-[#5B50FF]/10 flex overflow-x-hidden">
+      {/* Sidebar Navigation */}
+      <motion.div 
+        animate={{ width: isSidebarCollapsed ? 84 : 260 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed left-0 top-0 h-screen bg-white text-gray-900 z-[70] flex flex-col border-r border-gray-100 shadow-xl overflow-hidden shrink-0"
+      >
+        <div className="p-6 flex items-center justify-between mb-8 h-20">
+          <AnimatePresence mode="wait">
+            {!isSidebarCollapsed && (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                exit={{ opacity: 0, x: -20 }}
+                className="flex items-center gap-3"
               >
-                <Layers className="w-4 h-4 text-gray-400 group-hover:text-[#5B50FF]" />
-                <span className="text-[11px] font-black text-gray-400 group-hover:text-gray-900 uppercase tracking-widest">作品库</span>
+                <div className="w-8 h-8 bg-[#5B50FF] rounded-lg flex items-center justify-center font-black italic shadow-lg shadow-[#5B50FF]/20 text-sm text-white">F</div>
+                <span className="font-black tracking-tighter text-xl italic uppercase text-gray-900">FloorAI</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <button 
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className={`p-2 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-gray-900 transition-colors ${isSidebarCollapsed ? 'mx-auto' : ''}`}
+          >
+            {isSidebarCollapsed ? <Menu className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+          </button>
+        </div>
+
+        <nav className="flex-1 px-4 space-y-2">
+          {[
+            { id: 'images', label: '效果图生成', icon: LayoutGrid },
+            { id: 'video', label: '演示视频', icon: VideoIcon },
+          ].map((item) => {
+            const isActive = currentView === item.id;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id as any)}
+                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all group relative ${
+                  isActive 
+                    ? 'bg-[#5B50FF] text-white shadow-lg shadow-[#5B50FF]/20' 
+                    : 'text-gray-400 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-white' : 'group-hover:text-[#5B50FF]'}`} />
+                {!isSidebarCollapsed && (
+                  <motion.span 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    className="font-black text-[11px] uppercase tracking-widest whitespace-nowrap"
+                  >
+                    {item.label}
+                  </motion.span>
+                )}
+                {isActive && !isSidebarCollapsed && (
+                  <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full" />
+                )}
+                {isActive && isSidebarCollapsed && (
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[#5B50FF] rounded-l-full" />
+                )}
               </button>
-            </div>
-            
-            <div className="flex items-center gap-6">
-              <div className="hidden sm:flex flex-col items-end">
-                <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">我的积分资产</span>
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-3.5 h-3.5 text-[#5B50FF]" />
-                  <span className="text-lg font-black text-gray-900 italic tracking-tighter">{saas.user.integral}</span>
+            );
+          })}
+        </nav>
+
+        <div className="p-6 border-t border-gray-100">
+           {!isSidebarCollapsed ? (
+             <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+               <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">系统负载：就绪</p>
+               <div className="flex items-center gap-2">
+                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                 <span className="text-[10px] font-bold text-gray-400 italic">渲染加速卡已挂载</span>
+               </div>
+             </div>
+           ) : (
+             <div className="flex justify-center">
+               <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+             </div>
+           )}
+        </div>
+      </motion.div>
+
+      {/* Content Wrapper */}
+      <motion.div 
+        animate={{ paddingLeft: isSidebarCollapsed ? 84 : 260 }}
+        className="flex-1 min-w-0"
+      >
+        {/* SaaS User Bar */}
+        {saas.initialized && saas.user && (
+          <div className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 shadow-sm backdrop-blur-md bg-white/80">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-gradient-to-tr from-[#5B50FF] to-[#8B50FF] rounded-xl flex items-center justify-center text-white font-black italic shadow-lg shadow-[#5B50FF]/20">
+                  {saas.user.name.charAt(0)}
                 </div>
+                <div>
+                  <h4 className="text-sm font-black text-gray-900 leading-tight tracking-tight uppercase italic">{saas.user.name}</h4>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{saas.user.enterprise}</p>
+                </div>
+                <div className="h-8 w-px bg-gray-100 mx-2" />
+                <button 
+                  onClick={() => setShowGallery(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-[#5B50FF]/5 rounded-xl transition-all group"
+                >
+                  <Layers className="w-4 h-4 text-gray-400 group-hover:text-[#5B50FF]" />
+                  <span className="text-[11px] font-black text-gray-400 group-hover:text-gray-900 uppercase tracking-widest">作品库</span>
+                </button>
               </div>
-              <div className="h-8 w-px bg-gray-100" />
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">当前工具消耗</span>
-                <span className="text-sm font-black text-[#5B50FF] italic tracking-tight">-{saas.tool?.integral || 10} / 次</span>
+              
+              <div className="flex items-center gap-6">
+                <div className="hidden sm:flex flex-col items-end">
+                  <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">我的积分资产</span>
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-3.5 h-3.5 text-[#5B50FF]" />
+                    <span className="text-lg font-black text-gray-900 italic tracking-tighter">{saas.user.integral}</span>
+                  </div>
+                </div>
+                <div className="h-8 w-px bg-gray-100" />
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">当前工具消耗</span>
+                  <span className="text-sm font-black text-[#5B50FF] italic tracking-tight">-{saas.tool?.integral || 10} / 次</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        {/* Alerts */}
-        <AnimatePresence>
-          {saas.insufficientPoints && (
+        {/* View Routing */}
+        <AnimatePresence mode="wait">
+          {currentView === 'images' ? (
             <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 shadow-sm"
+              key="images"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-7xl mx-auto px-6 py-12 pb-32"
             >
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              <p className="text-sm font-bold tracking-tight">账户积分不足，无法启动渲染。请及时充值或联系管理员。</p>
-              <button 
-                onClick={() => setSaas(p => ({ ...p, insufficientPoints: false }))}
-                className="ml-auto text-xs font-black uppercase tracking-widest bg-white px-4 py-2 rounded-xl shadow-sm border border-red-100 hover:bg-red-100 transition-colors"
-              >
-                我知道了
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <AnimatePresence>
+                {saas.insufficientPoints && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 shadow-sm"
+                  >
+                    <AlertCircle className="w-5 h-5 shrink-0" />
+                    <p className="text-sm font-bold tracking-tight">账户积分不足，无法启动渲染。请及时充值或联系管理员。</p>
+                    <button 
+                      onClick={() => setSaas(p => ({ ...p, insufficientPoints: false }))}
+                      className="ml-auto text-xs font-black uppercase tracking-widest bg-white px-4 py-2 rounded-xl shadow-sm border border-red-100 hover:bg-red-100 transition-colors"
+                    >
+                      我知道了
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
         
         {/* Top Section Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -927,23 +1044,6 @@ export default function App() {
                 img={materialImg}
                 onUpload={handleMaterialUpload}
               />
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <button 
-                  onClick={handleAIRecommend}
-                  disabled={isAnalyzingRoom || !roomImg}
-                  className="flex items-center justify-center gap-2 py-3 px-4 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-bold text-gray-600 hover:bg-[#5B50FF]/5 hover:border-[#5B50FF]/30 transition-all group disabled:opacity-50"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-[#5B50FF] group-hover:animate-pulse" />
-                  AI 智能推荐
-                </button>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar items-center px-1">
-                  {['原木', '鱼骨', '石纹'].map(t => (
-                    <span key={t} className="px-3 py-1 bg-gray-100 rounded-full text-[9px] font-black text-gray-400 uppercase tracking-tighter cursor-help hover:bg-gray-200 shrink-0">
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-              </div>
             </Card>
           </div>
 
@@ -1111,23 +1211,26 @@ export default function App() {
             </Card>
 
             {/* Step 5: Generate */}
-            <div className="space-y-4">
+            <div className="flex justify-start pt-4">
               <button 
                 onClick={handleGenerate}
                 disabled={isGenerating || !roomImg || saas.isVerifying}
-                className="w-full h-[140px] bg-[#0A0D18] rounded-[32px] group relative overflow-hidden flex flex-col items-center justify-center text-white transition-all active:scale-[0.98] hover:shadow-[0_20px_60px_rgba(0,0,0,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-[52px] px-10 bg-[#0A0D18] rounded-2xl group relative overflow-hidden flex items-center justify-center gap-4 text-white transition-all active:scale-[0.98] hover:shadow-[0_20px_60px_rgba(0,0,0,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#5B50FF]/2 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[1500ms] cubic-bezier(0.4, 0, 0.2, 1)" />
-                <div className="w-14 h-14 bg-[#5B50FF] rounded-2xl flex items-center justify-center shadow-[0_4px_24px_rgba(91,80,255,0.4)] mb-3 group-hover:scale-110 transition-transform">
-                  {isGenerating || saas.isVerifying ? <Loader2 className="w-7 h-7 animate-spin" /> : <Sparkles className="w-7 h-7" />}
+                <div className="w-8 h-8 bg-[#5B50FF] rounded-xl flex items-center justify-center shadow-[0_4px_16px_rgba(91,80,255,0.3)] group-hover:scale-110 transition-transform flex-shrink-0">
+                  {isGenerating || saas.isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 </div>
-                <h3 className="text-2xl font-black italic tracking-tight uppercase leading-none">
-                  {isGenerating ? '正在生成渲染管线...' : saas.isVerifying ? '正在校验资产' : '开启全景替换渲染'}
-                </h3>
-                <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-2 overflow-hidden whitespace-nowrap text-ellipsis px-10">
-                  {isGenerating ? '正在调用深度神经网络' : saas.isVerifying ? '正在接洽 SaaS 授权服务器' : `${angles.length} 个视角准备就绪 • 预计消耗 ${saas.tool?.integral ? saas.tool.integral : 10} 积分`}
-                </p>
+                <div className="flex flex-col items-start justify-center">
+                  <h3 className="text-sm font-black italic tracking-tight uppercase leading-none">
+                    {isGenerating ? '正在生成...' : saas.isVerifying ? '正在校验' : '开启全景替换渲染'}
+                  </h3>
+                  <p className="text-gray-500 text-[8px] font-bold uppercase tracking-widest mt-1 opacity-70">
+                    {isGenerating ? 'AI 解析中' : saas.isVerifying ? 'SaaS 授权' : `${angles.length} 个视角准备就绪`}
+                  </p>
+                </div>
               </button>
+            </div>
               
               {saas.initialized && saas.user && (
                 <div className="flex items-center justify-between px-6 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm">
@@ -1141,7 +1244,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </div>
           </div>
         </div>
 
@@ -1215,30 +1317,190 @@ export default function App() {
             )}
           </div>
         </section>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="video"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-7xl mx-auto px-6 py-12 pb-32"
+            >
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Left: Configuration */}
+                <div className="lg:col-span-4 space-y-6">
+                  <Card title="视频生成配置" icon={<VideoIcon className="w-4 h-4 text-[#5B50FF]" />}>
+                    <div className="space-y-6">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block italic">镜头拍摄提示词</label>
+                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-[11px] font-medium leading-relaxed text-gray-600 italic">
+                          {videoPromptBase}
+                        </div>
+                      </div>
 
-        <AnimatePresence>
-          {showGallery && saas.userId && (
-            <Gallery 
-              userId={saas.userId} 
-              role={(saas.user as any)?.role || 1} 
-              onClose={() => setShowGallery(false)} 
-            />
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block italic">选择参考图 (History)</label>
+                        <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
+                          {history.map((h) => (
+                            <button
+                              key={h.id}
+                              onClick={() => setSelectedVideoSourceId(h.id)}
+                              className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                                selectedVideoSourceId === h.id ? 'border-[#5B50FF] shadow-lg shadow-[#5B50FF]/20 scale-[0.98]' : 'border-transparent opacity-60 hover:opacity-100'
+                              }`}
+                            >
+                              <img src={h.img} alt="Ref" className="w-full h-full object-cover" />
+                              {selectedVideoSourceId === h.id && (
+                                <div className="absolute inset-0 bg-[#5B50FF]/20 flex items-center justify-center">
+                                  <CheckCircle2 className="w-5 h-5 text-white" />
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                          {history.length === 0 && (
+                            <div className="col-span-2 py-10 flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-xl">
+                              <ImageIcon className="w-6 h-6 text-gray-200 mb-2" />
+                              <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">请先生成效果图</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleGenerateVideo}
+                        disabled={isVideoGenerating || !selectedVideoSourceId}
+                        className="w-full h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center gap-3 font-black italic uppercase text-xs tracking-widest hover:bg-[#0A0D18] transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                      >
+                        {isVideoGenerating ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-[#5B50FF]" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-[#5B50FF] group-hover:animate-pulse" />
+                        )}
+                        {isVideoGenerating ? '时空渲染加速中...' : '启动视频演练生成'}
+                      </button>
+                    </div>
+                  </Card>
+
+                  <div className="p-6 bg-white rounded-[32px] border border-gray-100 shadow-sm">
+                    <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                       <span className="w-1 h-1 bg-[#5B50FF] rounded-full" />
+                       渲染演进参数
+                    </h4>
+                    <div className="space-y-4">
+                      {[
+                        { label: '帧率控制', val: '60 FPS (Cinema)' },
+                        { label: '时空稠密度', val: '1.2x Enhanced' },
+                        { label: '反光追踪', val: 'Raytraced High' }
+                      ].map(item => (
+                        <div key={item.label} className="flex items-center justify-between">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase">{item.label}</span>
+                          <span className="text-[9px] font-black text-gray-600 uppercase italic tracking-wider">{item.val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Preview Area */}
+                <div className="lg:col-span-8">
+                  <div className="bg-white rounded-[40px] border border-gray-100 shadow-xl overflow-hidden aspect-video relative flex flex-col items-center justify-center group">
+                    <AnimatePresence mode="wait">
+                      {videoResult ? (
+                        <motion.video
+                          key={videoResult}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          src={videoResult}
+                          controls
+                          autoPlay
+                          loop
+                          className="w-full h-full object-cover"
+                        />
+                      ) : isVideoGenerating ? (
+                        <motion.div 
+                          key="loading"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="flex flex-col items-center gap-6"
+                        >
+                          <div className="w-20 h-20 border-4 border-[#5B50FF]/10 border-t-[#5B50FF] rounded-full animate-spin" />
+                          <div className="text-center">
+                             <p className="text-lg font-black italic text-gray-900 uppercase tracking-tight">正在构建深度时空帧...</p>
+                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] mt-2 animate-pulse">GPU Clusters Active • VEO-1 ENGINE</p>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <motion.div 
+                          key="empty"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="flex flex-col items-center gap-6 p-12 text-center"
+                        >
+                           <div className="w-24 h-24 bg-gray-50 rounded-[32px] flex items-center justify-center text-gray-200">
+                             <VideoIcon className="w-10 h-10" />
+                           </div>
+                           <div>
+                             <p className="text-xl font-black italic text-gray-900 uppercase tracking-tighter">待命 - 预览监视器</p>
+                             <p className="text-sm font-medium text-gray-400 max-w-sm mt-2 leading-relaxed">
+                               请从左侧选择渲染好的 4K 效果图作为参考，系统将基于「高端家居电商」提示词生成动态漫游视频
+                             </p>
+                           </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {videoResult && (
+                      <div className="absolute bottom-8 right-8 flex gap-3">
+                         <button className="h-12 px-6 bg-white/90 backdrop-blur rounded-2xl flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-900 shadow-xl hover:bg-white transition-all">
+                           <Download className="w-4 h-4" />
+                           下载 4K 视频
+                         </button>
+                         <button
+                           onClick={() => setVideoResult(null)}
+                           className="w-12 h-12 bg-white/90 backdrop-blur rounded-2xl flex items-center justify-center text-gray-900 shadow-xl hover:bg-white transition-all"
+                         >
+                           <X className="w-5 h-5" />
+                         </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {['1080P', '4K Ultra', 'H.265', 'BT.2020 Color'].map(t => (
+                      <div key={t} className="px-4 py-3 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-3 shadow-sm">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                        <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
 
-        <AnimatePresence>
-          {previewImg && <PreviewModal img={previewImg} onClose={() => setPreviewImg(null)} />}
-        </AnimatePresence>
-
-        <footer className="mt-40 text-center border-t border-gray-100 pt-20">
+        <footer className="mt-40 text-center border-t border-gray-100 pt-20 pb-20">
           <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">
-            <span className="hover:text-[#5B50FF] transition-colors cursor-default">GEMINI 2.5 FLASH</span>
+            <span className="hover:text-[#5B50FF] transition-colors cursor-default">GEMINI 2.3 FLASH</span>
             <span className="hover:text-[#5B50FF] transition-colors cursor-default">STABLE DIFFUSION XL</span>
-            <span className="hover:text-[#5B50FF] transition-colors cursor-default">VISION ENGINE V1.2</span>
+            <span className="hover:text-[#5B50FF] transition-colors cursor-default">VISION ENGINE V1.3</span>
           </div>
           <p className="text-gray-400 text-[10px] font-bold mt-10 uppercase tracking-widest opacity-50">© 2026 FLOORAI SYSTEM. EMPOWERED BY NEXT-GEN SPATIAL AI.</p>
         </footer>
-      </main>
+      </motion.div>
+
+      {/* Overlays */}
+      <AnimatePresence>
+        {showGallery && saas.userId && (
+          <Gallery 
+            userId={saas.userId} 
+            role={(saas.user as any)?.role || 1} 
+            onClose={() => setShowGallery(false)} 
+          />
+        )}
+        {previewImg && <PreviewModal img={previewImg} onClose={() => setPreviewImg(null)} />}
+      </AnimatePresence>
     </div>
   );
 }
