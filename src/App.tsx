@@ -472,12 +472,8 @@ export default function App() {
   const [videoResult, setVideoResult] = useState<string | null>(null);
   const [videoResolution, setVideoResolution] = useState('1080p');
   const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
-  const [videoStyle, setVideoStyle] = useState<'slow_push' | 'orbital'>('slow_push');
 
-  const videoPrompts = {
-    slow_push: "高端家居电商视频，基于参考图像生成。镜头以稳定轨道运动缓慢环绕房间，地板在移动光线下呈现微妙反光变化。色调温暖自然，对比度适中，突出地板的高级质感。画面构图留白合理，电影级商品摄影。",
-    orbital: "稳定轨道式环绕运镜，以图像中心为轴心匀速水平旋转120度。自然窗光在旋转过程中在地板表面形成动态高光移动，真实呈现地板光泽度。色调温暖统一，无突兀色偏。画面构图始终均衡，适合品牌宣传视频，无压缩痕迹。"
-  };
+  const videoPrompt = "高端家居电商视频，基于参考图像生成。前4秒采用稳定轨道式中景环绕运镜，以图像中心为轴心匀速水平旋转；后4秒镜头自然衔接并缓慢向主体推进。全过程窗光在旋转和推进中在地板表面形成动态、自然的连贯高光移动，真实呈现地板质感。色调温暖统一，构图专业，电影级镜头语言。";
 
   const handleGenerateVideo = async () => {
     if (!selectedVideoSourceId) return;
@@ -492,7 +488,7 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          prompt: videoPrompts[videoStyle],
+          prompt: videoPrompt,
           imageUrl: selectedSource.img,
           resolution: videoResolution,
           aspectRatio: videoAspectRatio
@@ -1474,28 +1470,6 @@ export default function App() {
                               <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">请先在「效果图生成」中创建作品</span>
                             </div>
                           )}
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block italic">运镜风格</label>
-                        <div className="flex gap-2">
-                          {[
-                            { id: 'slow_push' as const, label: '缓慢推进' },
-                            { id: 'orbital' as const, label: '中景环绕' }
-                          ].map(style => (
-                            <button
-                              key={style.id}
-                              onClick={() => setVideoStyle(style.id)}
-                              className={`flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
-                                videoStyle === style.id 
-                                  ? 'bg-[#5B50FF] text-white shadow-lg shadow-[#5B50FF]/20' 
-                                  : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                              }`}
-                            >
-                              {style.label}
-                            </button>
-                          ))}
                         </div>
                       </div>
 
