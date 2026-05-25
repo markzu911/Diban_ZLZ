@@ -473,7 +473,7 @@ export default function App() {
   const [videoResolution, setVideoResolution] = useState('1080p');
   const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
 
-  const videoPrompt = "高端家居电商视频，基于参考图像生成。前4秒采用稳定轨道式中景环绕运镜，以图像中心为轴心匀速水平旋转；后4秒镜头自然衔接并缓慢向主体推进。全过程窗光在旋转和推进中在地板表面形成动态、自然的连贯高光移动，真实呈现地板质感。色调温暖统一，构图专业，电影级镜头语言。";
+  const videoPrompt = "顶级家居产品表现视频。运镜分为两个逻辑阶段：第一阶段（0-4秒），摄像机采用低角度近景，绕地板区域进行平滑的轨道环绕（Close-up Orbital），深度刻画地板的木纹细节、材质纹理与高级光泽感；第二阶段（4-8秒），镜头丝滑衔接并逐渐向上平滑抬升、同时稍微拉远（Tilt Up & Pull Back），将视觉焦点从地面平稳扩展至整个房间的室内装修全景。全过程保持电影级平稳运镜，自然窗影随动产生连贯的光斑位移，视觉节奏优雅自然。";
 
   const handleGenerateVideo = async () => {
     if (!selectedVideoSourceId) return;
