@@ -449,6 +449,7 @@ export default function App() {
   const [materialImgBase64, setMaterialImgBase64] = useState<string | null>(null);
   const [isAnalyzingRoom, setIsAnalyzingRoom] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pendingRoomFile, setPendingRoomFile] = useState<File | null>(null);
   
   const [step3, setStep3] = useState<Step3State>({
     spaceType: '客餐厅',
@@ -471,7 +472,12 @@ export default function App() {
   const [videoResult, setVideoResult] = useState<string | null>(null);
   const [videoResolution, setVideoResolution] = useState('1080p');
   const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
-  const videoPromptBase = "高端家居电商视频，基于参考图像生成。镜头以稳定轨道运动缓慢环绕房间，地板在移动光线下呈现微妙反光变化。色调温暖自然，对比度适中，突出地板的高级质感。画面构图留白合理，电影级商品摄影。";
+  const [videoStyle, setVideoStyle] = useState<'slow_push' | 'orbital'>('slow_push');
+
+  const videoPrompts = {
+    slow_push: "高端家居电商视频，基于参考图像生成。镜头以稳定轨道运动缓慢环绕房间，地板在移动光线下呈现微妙反光变化。色调温暖自然，对比度适中，突出地板的高级质感。画面构图留白合理，电影级商品摄影。",
+    orbital: "稳定轨道式环绕运镜，以图像中心为轴心匀速水平旋转120度。自然窗光在旋转过程中在地板表面形成动态高光移动，真实呈现地板光泽度。色调温暖统一，无突兀色偏。画面构图始终均衡，适合品牌宣传视频，无压缩痕迹。"
+  };
 
   const handleGenerateVideo = async () => {
     if (!selectedVideoSourceId) return;
@@ -486,7 +492,7 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          prompt: videoPromptBase,
+          prompt: videoPrompts[videoStyle],
           imageUrl: selectedSource.img,
           resolution: videoResolution,
           aspectRatio: videoAspectRatio
@@ -558,15 +564,25 @@ export default function App() {
     }
   };
 
-  // --- Step 1: Analysis ---
-  const handleRoomUpload = async (file: File) => {
+  // --- Step 1: Upload & Preview ---
+  const handleRoomUpload = (file: File) => {
     const url = URL.createObjectURL(file);
     setRoomImg(url);
-    setRoomImgBase64(null); // Clear previous to prevent mixups
+    setPendingRoomFile(file);
+    setRoomImgBase64(null);
+    setMaterialImg(null);
+    setMaterialImgBase64(null);
+    setHistory([]);
+    setVideoResult(null);
+    setSelectedVideoSourceId(null);
+  };
+
+  const startRoomAnalysis = async () => {
+    if (!pendingRoomFile) return;
     setIsAnalyzingRoom(true);
 
     try {
-      const base64 = await fileToBase64(file);
+      const base64 = await fileToBase64(pendingRoomFile);
       setRoomImgBase64(base64);
       const pureBase64 = base64.split(',')[1];
 
@@ -582,7 +598,7 @@ export default function App() {
         model: "gemini-3-flash-preview",
         contents: { parts: [
           { text: prompt },
-          { inlineData: { mimeType: file.type, data: pureBase64 } }
+          { inlineData: { mimeType: pendingRoomFile.type, data: pureBase64 } }
         ]},
         config: {
           responseMimeType: "application/json",
@@ -607,6 +623,7 @@ export default function App() {
         lighting: data.lighting || '自然天光',
         obstacles: data.obstacles || []
       });
+      setPendingRoomFile(null); // Analysis complete
     } catch (error) {
       console.error("Analysis failed", error);
     } finally {
@@ -1075,15 +1092,58 @@ export default function App() {
                 onUpload={handleRoomUpload}
                 isLoading={isAnalyzingRoom}
               />
-              {roomImg && !isAnalyzingRoom && (
-                <div className="mt-6 flex items-center justify-between p-3 bg-green-50/50 rounded-xl border border-green-100">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-green-500" />
-                    <span className="text-[10px] font-bold text-green-700 italic uppercase tracking-wider text-ellipsis overflow-hidden">Analysis Complete</span>
-                  </div>
-                  <span className="text-[10px] font-bold text-green-600 whitespace-nowrap">识别成功</span>
-                </div>
-              )}
+              
+              <div className="mt-4 space-y-4">
+                <button
+                  onClick={startRoomAnalysis}
+                  disabled={!roomImg || isAnalyzingRoom || !!roomImgBase64}
+                  className={`w-full h-12 rounded-2xl font-black uppercase tracking-widest italic shadow-lg transition-all flex items-center justify-center gap-2 ${
+                    !roomImg
+                      ? 'bg-gray-50 text-gray-300 cursor-not-allowed shadow-none border border-dashed border-gray-200'
+                      : isAnalyzingRoom 
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
+                        : roomImgBase64 
+                          ? 'bg-green-50 text-green-600 border border-green-100 cursor-default shadow-none'
+                          : 'bg-[#5B50FF] text-white shadow-[#5B50FF]/20 hover:bg-[#4A40FF]'
+                  }`}
+                >
+                  {isAnalyzingRoom ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      >
+                        <Loader2 className="w-5 h-5" />
+                      </motion.div>
+                      正在智能解析...
+                    </>
+                  ) : roomImgBase64 ? (
+                    <>
+                      <ShieldCheck className="w-5 h-5" />
+                      解析已完成
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      开始物理语义分析
+                    </>
+                  )}
+                </button>
+
+                {roomImg && roomImgBase64 && !isAnalyzingRoom && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center justify-between p-3 bg-green-50/30 rounded-xl border border-green-100/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      <span className="text-[10px] font-black text-green-700 italic uppercase tracking-wider">AI Identification Success</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-green-600">地面边界已锁定</span>
+                  </motion.div>
+                )}
+              </div>
             </Card>
 
             <Card>
@@ -1414,6 +1474,28 @@ export default function App() {
                               <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">请先在「效果图生成」中创建作品</span>
                             </div>
                           )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block italic">运镜风格</label>
+                        <div className="flex gap-2">
+                          {[
+                            { id: 'slow_push' as const, label: '缓慢推进' },
+                            { id: 'orbital' as const, label: '中景环绕' }
+                          ].map(style => (
+                            <button
+                              key={style.id}
+                              onClick={() => setVideoStyle(style.id)}
+                              className={`flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                                videoStyle === style.id 
+                                  ? 'bg-[#5B50FF] text-white shadow-lg shadow-[#5B50FF]/20' 
+                                  : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                              }`}
+                            >
+                              {style.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
