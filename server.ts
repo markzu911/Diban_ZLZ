@@ -16,15 +16,8 @@ async function startServer() {
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
-  // Video Generation Routes
-  app.post("/api/video/generate", startVideoGeneration);
-  app.post("/api/video/status", getVideoStatus);
-  app.post("/api/video/download", downloadVideo);
-
   // Middleware to adapt Express req/res to Vercel handler
   app.all("/api/*", async (req, res) => {
-    // Vercel handles body parsing, but for local express we already have express.json()
-    // We just pass req and res to the proxyHandler
     try {
       await proxyHandler(req, res);
     } catch (error: any) {

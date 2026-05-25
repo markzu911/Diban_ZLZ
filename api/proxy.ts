@@ -1,4 +1,5 @@
 import axios from "axios";
+import { startVideoGeneration, getVideoStatus, downloadVideo } from "./video.js";
 
 export default async function handler(req: any, res: any) {
   // CORS Headers
@@ -15,8 +16,8 @@ export default async function handler(req: any, res: any) {
   console.log(`Processing ${method} request for ${reqUrl}`);
 
   try {
-    // 1. Handle Gemini API Proxy
-    if (normalizedUrl.includes("/api/gemini")) {
+    // 1. Handle Gemini Image/Content Proxy (Effect Image)
+    if (normalizedUrl.startsWith("/api/gemini")) {
       if (req.method !== "POST") {
         return res.status(405).json({ error: "Method Not Allowed" });
       }
@@ -53,7 +54,18 @@ export default async function handler(req: any, res: any) {
       return res.status(response.status).json(response.data);
     }
 
-    // 2. Handle SaaS API Proxy (Launch, Verify, Consume, Upload)
+    // 2. Handle Video Generation Proxy (Gemini Veo)
+    if (normalizedUrl.startsWith("/api/video/generate")) {
+      return startVideoGeneration(req, res);
+    }
+    if (normalizedUrl.startsWith("/api/video/status")) {
+      return getVideoStatus(req, res);
+    }
+    if (normalizedUrl.startsWith("/api/video/download")) {
+      return downloadVideo(req, res);
+    }
+
+    // 3. Handle SaaS API Proxy (Launch, Verify, Consume, Upload)
     const saasEndpoints = ["/api/tool/", "/api/upload/"];
     const matchedEndpoint = saasEndpoints.find(ep => normalizedUrl.includes(ep));
 
