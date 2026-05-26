@@ -474,29 +474,79 @@ export default function App() {
   const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
 
   const videoPrompt = `
-Luxury interior commercial video.
+Luxury interior flooring commercial video.
 
-TWO DISTINCT SHOTS.
+IMPORTANT:
+The ORIGINAL floor from the uploaded room photo no longer exists.
+The ENTIRE floor has already been replaced with the NEW flooring material shown in the final generated image.
 
-SHOT 1 (0-4s):
-Low-angle close-up orbital camera movement around the wooden floor.
-Macro cinematic texture details.
-Luxury commercial lighting.
+The video MUST be fully based on the FINAL FLOOR-REPLACED IMAGE.
+DO NOT recreate the old flooring.
+
+━━━━━━━━━━━━━━━
+SHOT 1 (0-4s)
+━━━━━━━━━━━━━━━
+
+Extreme close-up floor cinematic shot.
+
+The camera stays LOW near the ground surface,
+only 50-60cm above the floor.
+
+The camera performs a smooth CLOSE-RANGE ORBITAL MOVEMENT around the NEW FLOOR SURFACE itself.
+
+IMPORTANT:
+The movement is orbiting around the FLOOR TEXTURE AREA,
+NOT around the room.
+
+The frame is dominated by:
+- wood grain details
+- floor texture
+- surface reflections
+- premium material finish
+- realistic micro details
+- luxury craftsmanship
+
+The floor occupies most of the screen.
+Furniture and walls remain heavily blurred and secondary.
+
+Macro commercial flooring advertisement style.
 Shallow depth of field.
+Cinematic lighting.
 
-At exactly 4 seconds:
-HARD CINEMATIC CUT.
-NEW CAMERA SETUP.
+━━━━━━━━━━━━━━━
+HARD CUT AT 4 SECONDS
+━━━━━━━━━━━━━━━
+
+A completely different camera setup begins.
 NOT a continuous shot.
 
-SHOT 2 (4-8s):
-Wide interior cinematic shot.
-Tilt up and pull back movement.
-Reveal the entire luxury room interior.
-Natural sunlight and elegant spatial atmosphere.
+━━━━━━━━━━━━━━━
+SHOT 2 (4-8s)
+━━━━━━━━━━━━━━━
 
-The second shot must look visually different from the first shot.
-Commercial advertisement cinematography.
+First-person cinematic interior view.
+
+The camera slowly moves forward into the room
+with a gentle steady push-in movement.
+
+Natural human-eye perspective.
+No orbit movement.
+No tilt-up movement.
+No dramatic camera rotation.
+
+The movement should feel calm, immersive, and realistic,
+as if the viewer is walking slowly through the redesigned interior space.
+
+Focus on:
+- the overall atmosphere of the room
+- harmony between the NEW FLOOR and furniture
+- natural sunlight
+- premium interior design feeling
+
+The NEW FLOOR must remain visually identical and consistent in both shots.
+
+Ultra realistic.
+High-end flooring commercial video.
 `;
 
   const handleGenerateVideo = async () => {
