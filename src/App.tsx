@@ -1674,7 +1674,7 @@ High-end flooring commercial video.
                                <div className="flex gap-1">
                                  {[1, 2, 3].map(i => <div key={i} className={`w-1.5 h-1.5 rounded-full bg-[#5B50FF] animate-bounce`} style={{ animationDelay: `${i*0.2}s` }} />)}
                                </div>
-                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.4em]">GPU CLUSTER: VEO-1 ENGINE ACTIVE</p>
+                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.4em]">GPU CLUSTER: VEO-3.1 ENGINE ACTIVE</p>
                              </div>
                           </div>
                         </motion.div>
@@ -1715,9 +1715,9 @@ High-end flooring commercial video.
 
         <footer className="mt-40 text-center border-t border-gray-100 pt-20 pb-20">
           <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">
-            <span className="hover:text-[#5B50FF] transition-colors cursor-default">GEMINI 2.3 FLASH</span>
-            <span className="hover:text-[#5B50FF] transition-colors cursor-default">STABLE DIFFUSION XL</span>
-            <span className="hover:text-[#5B50FF] transition-colors cursor-default">VISION ENGINE V1.3</span>
+            <span className="hover:text-[#5B50FF] transition-colors cursor-default">GEMINI 3.5 FLASH</span>
+            <span className="hover:text-[#5B50FF] transition-colors cursor-default">VE0-3.1 GENERATE</span>
+            <span className="hover:text-[#5B50FF] transition-colors cursor-default">VISION ENGINE V3.1</span>
           </div>
           <p className="text-gray-400 text-[10px] font-bold mt-10 uppercase tracking-widest opacity-50">© 2026 FLOORAI SYSTEM. EMPOWERED BY NEXT-GEN SPATIAL AI.</p>
         </footer>

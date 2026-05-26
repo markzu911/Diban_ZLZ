@@ -31,7 +31,7 @@ export async function startVideoGeneration(req: any, res: any) {
     const base64Image = Buffer.from(imageBuffer).toString('base64');
 
     const operation = await ai.models.generateVideos({
-      model: 'veo-3.1',
+      model: 'veo-3.1-generate-preview',
       prompt: prompt,
       image: {
         imageBytes: base64Image,
