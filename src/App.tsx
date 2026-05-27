@@ -877,28 +877,32 @@ High-end flooring commercial video.
           - Lighting: High-contrast directional lighting to cast tiny shadows in the recesses of the texture.`;
         }
 
-        const floorDesc = `TARGET FLOOR REPLACEMENT:
-        - Absolute Material: ${step3.targetFloor}
-        - Color Integrity: ${materialImgBase64 ? 'Extract and replicate the EXACT hex-color and tonal values from Image 2.' : `Strictly use the color: ${step3.floorDetails?.color || 'as described in material name'}.`}
-        - Shape & Pattern: ${step3.floorDetails?.shape || 'Standard'} with ${step3.floorDetails?.pattern || 'Seamless'} layout.
-        - Surface Detail: Match the physical relief/bumps (${step3.floorDetails?.relief || 'High-fidelity'}) and sheen (${step3.floorDetails?.finish || 'Natural'}) precisely.`;
+        const floorDesc = `[GROUND TRUTH: TARGET MATERIAL REPLACEMENT]
+        - REQUIRED MATERIAL: ${step3.targetFloor}
+        - SOURCE VALIDATION: Image 2 contains the ONLY valid material. REPLICATE ITS TEXTURE 1:1.
+        - COLOR INTEGRITY: ${materialImgBase64 ? 'EXTRACT ALL HEX-COLOR DATA FROM IMAGE 2. NON-NEGOTIABLE.' : `Use color: ${step3.floorDetails?.color || 'as specified in material name'}.`}
+        - PHYSICAL ATTRIBUTES: Shape: ${step3.floorDetails?.shape || 'Geometric'}; Pattern: ${step3.floorDetails?.pattern || 'Standard'}; Relief: ${step3.floorDetails?.relief || 'High-fidelity'}; Sheen: ${step3.floorDetails?.finish || 'Professional'}.`;
 
-        const renderPrompt = `TASK: PRECISION ARCHITECTURAL FLOOR REPLACEMENT
+        const renderPrompt = `[CRITICAL MISSION: TOTAL FLOOR OVERWRITE]
         
-        CRITICAL COLOR RULE: The output floor MUST match the exact chroma, saturation, and hue of the target material from Image 2. 
-        DO NOT allow the room's environmental lighting to fundamentally shift the perceived color of the material (no yellowing from warm lights or bluing from cold lights). 
-        The material's native color is the priority.
+        TASK: YOU MUST COMPLETELY DELETE AND REPLACE THE FLOOR IN IMAGE 1. 
+        IGNORE THE FLOORING PRESENT IN IMAGE 1 ENTIRELY. IT IS TEMPORARY AND WRONG.
         
-        INPUTS:
-        - Image 1: Room Geometry & Furniture (Preserve: ${step3.obstacles.join(', ')}).
-        ${materialImgBase64 ? '- Image 2: CHROMINANCE MASTER. This is the absolute truth for color. Replicate it 1:1.' : ''}
+        COLOR MASTER RULE: The pixels on the floor plane MUST match the exact chroma and saturation of Image 2. 
+        PRESERVE the material's native color even under the room's localized lighting. No color shift allowed.
+        
+        INPUT HIERARCHY:
+        1. IMAGE 1: Use for ROOM GEOMETRY & FURNITURE LAYOUT ONLY. (Preserve: ${step3.obstacles.join(', ')}).
+        2. IMAGE 2: Use as the ABSOLUTE TEXTURE & COLOR TEMPLATE for the floor.
 
+        [POV & LIGHTING]:
         ${anglePrompt}
 
+        [MATERIAL SPECS]:
         ${floorDesc}
 
-        ENVIRONMENT: ${step3.lighting} light. Preserve original room color temperature while applying the new floor.
-        QUALITY: Photorealistic, 8k, physically accurate render.`;
+        ENVIRONMENT: ${step3.lighting} mode. Seamlessly blend the NEW floor with existing furniture bases.
+        RENDER: Hyper-realistic, 8k cinematic architectural shot.`;
 
         const renderParts: any[] = [];
         if (roomImgBase64) {
