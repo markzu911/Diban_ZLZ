@@ -656,13 +656,13 @@ High-end flooring commercial video.
       setRoomImgBase64(base64);
       const pureBase64 = base64.split(',')[1];
 
-      const prompt = `Analyze this room image for floor replacement. Identify:
-      1. Space Type (e.g. Living Room, Bedroom)
-      2. Design Style (e.g. Modern, Vintage)
-      3. Current Floor Type
-      4. Lighting conditions
-      5. Furniture/Obstacles to preserve.
-      Return JSON format: {spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
+      const prompt = `分析这张房间图片以进行地板更换。识别：
+      1. 空间类型（如：客厅、卧室）
+      2. 设计风格（如：现代、复古）
+      3. 当前地板类型
+      4. 光照条件
+      5. 需要保留的家具/障碍物。
+      请使用中文返回 JSON 格式：{spaceType, designStyle, currentFloor, lighting, obstacles: string[]}`;
 
       const response = await callGemini({
         model: "gemini-3-flash-preview",
@@ -712,15 +712,15 @@ High-end flooring commercial video.
       setMaterialImgBase64(base64);
       const pureBase64 = base64.split(',')[1];
 
-      const prompt = `Identify this flooring material sample. 
-      Analyze with extreme care for physical surface characteristics:
-      1. Material Name (e.g. "Natural Oak")
-      2. Shape of the units (e.g. "rectangular planks", "square tiles", "hexagon")
-      3. Pattern/Layout (e.g. "Herringbone", "Fishbone", "Straight", "Chessboard")
-      4. Texture/Grain (e.g. "deep wood grain", "smooth marble", "coarse stone")
-      5. Physical Relief/Bumps (e.g. "wavy irregular protrusions", "deeply embossed grain", "flat smooth surface", "three-dimensional relief"). 
-      6. Finish/Surface (e.g. "matte", "glossy", "brushed", "satin")
-      Return JSON: { materialName, shape, pattern, texture, relief, finish }`;
+      const prompt = `识别此地板材质样品。
+      请极其仔细地分析物理表面特征：
+      1. 材质名称（如：“天然橡木”）
+      2. 单元形状（如：“长条板”、“方砖”、“六角形”）
+      3. 纹路/布局（如：“人字拼”、“鱼骨拼”、“工字拼”、“棋盘格”）
+      4. 纹理/木纹（如：“深色木纹”、“光滑大理石”、“粗糙石材”）
+      5. 物理起伏/颠簸（如：“波浪状不规则凸起”、“深度压花纹理”、“平滑表面”、“三维浮雕”）。
+      6. 光泽/表面（如：“哑光”、“高光”、“拉丝”、“柔光”）
+      请使用中文返回 JSON：{ materialName, shape, pattern, texture, relief, finish }`;
 
       const response = await callGemini({
         model: "gemini-3-flash-preview",
@@ -765,9 +765,9 @@ High-end flooring commercial video.
     setIsAnalyzingRoom(true);
     try {
       const pureBase64 = roomImgBase64.split(',')[1];
-      const prompt = `Based on this room image, recommend a flooring material that would look best. 
-      Consider the wall color, lighting, and existing style. 
-      Return JSON: { 
+      const prompt = `基于此房间图像，推荐最适合的地板材质。
+      考虑墙面颜色、光照和现有风格。
+      使用中文返回 JSON：{ 
         name: string, 
         reason: string,
         details: { color: string, shape: string, pattern: string, texture: string, relief: string, finish: string } 
@@ -1217,7 +1217,7 @@ High-end flooring commercial video.
                   >
                     <div className="flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                      <span className="text-[10px] font-black text-green-700 italic uppercase tracking-wider">AI Identification Success</span>
+                      <span className="text-[10px] font-black text-green-700 italic uppercase tracking-wider">AI 物理识别成功</span>
                     </div>
                     <span className="text-[10px] font-bold text-green-600">地面边界已锁定</span>
                   </motion.div>
@@ -1446,7 +1446,7 @@ High-end flooring commercial video.
         <section className="mt-28" id="history-section">
           <div className="flex items-center justify-between mb-10 border-b border-gray-100 pb-6">
             <div>
-              <h2 className="text-3xl font-black text-gray-900 tracking-tight italic uppercase">Recent Works</h2>
+              <h2 className="text-3xl font-black text-gray-900 tracking-tight italic uppercase">近期作品</h2>
               <p className="text-gray-400 text-sm mt-1 font-bold">已生成的提案历史汇集</p>
             </div>
             <button 
@@ -1481,7 +1481,7 @@ High-end flooring commercial video.
                     <div className="flex flex-col gap-1 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
                       <span className="text-white text-[10px] font-black uppercase tracking-[0.2em]">{design.time}</span>
                       <h4 className="text-white text-base font-bold flex items-center gap-2">
-                        {design.angle} 视角方案
+                        {design.angle} 方案
                         <div className="w-8 h-px bg-white/30" />
                       </h4>
                     </div>
@@ -1683,7 +1683,7 @@ High-end flooring commercial video.
                                <div className="flex gap-1">
                                  {[1, 2, 3].map(i => <div key={i} className={`w-1.5 h-1.5 rounded-full bg-[#5B50FF] animate-bounce`} style={{ animationDelay: `${i*0.2}s` }} />)}
                                </div>
-                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.4em]">GPU CLUSTER: VEO-3.1 ENGINE ACTIVE</p>
+                               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.4em]">GPU 集群：VEO-3.1 引擎已就绪</p>
                              </div>
                           </div>
                         </motion.div>
