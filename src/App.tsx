@@ -885,22 +885,24 @@ High-end flooring commercial video.
 
         const renderPrompt = `[MISSION: GENERATIVE ARCHITECTURAL STYLING]
         
-        TASK: GENERATE a new high-end architectural scene based on the style and elements found in IMAGE 1.
+        TASK: GENERATE a new high-end architectural scene INSPIRED by the style and elements in IMAGE 1. 
+        DO NOT copy the layout or camera position of Image 1 exactly. Create a fresh, superior composition.
         
-        [STYLE & COMPOSITION REFERENCE (IMAGE 1)]:
-        1. ATMOSPHERE: Replicate the ${step3.designStyle} design style and ${step3.lighting} mood from Image 1.
-        2. ELEMENTS: Include key architectural elements and furniture: ${step3.obstacles.join(', ')}.
-        3. SPATIAL FLOW: Maintain a similar perspective and layout as Image 1, but feel free to enhance the composition for maximum aesthetic impact.
+        [STYLE & COMPOSITION INSPIRATION (IMAGE 1)]:
+        1. ATMOSPHERE: Replicate the ${step3.designStyle} design aesthetic and ${step3.lighting} mood.
+        2. ELEMENTS: Use these elements as style references: ${step3.obstacles.join(', ')}. You may rearrange them, exchange them for similar high-end alternatives, or reimagine their layout for a better shot.
+        3. SPATIAL VARIATION: Move the camera. Change the vantage point. IMAGE 1 is only for style and item inspiration, NOT a geometric constraint.
         
         [FLOOR MATERIAL MASTER (IMAGE 2)]:
         1. MANDATORY FLOOR: You MUST use the exact flooring material from IMAGE 2.
-        2. ORIENTATION: Align the material's grain, planks, or grid seams with the detected perspective flow of the room from Image 1.
-        3. COLOR & TEXTURE: Image 2 is the absolute reference for floor color, sheen, and physical relief. Do not deviate from Image 2.
+        2. PERSPECTIVE: The material's grain, planks, or grid seams MUST flow naturally with the new perspective you create for this generated scene.
+        3. COLOR & TEXTURE: Image 2 is the absolute reference for floor color, sheen, and physical relief. Do not deviate.
+        4. SCALE: REDUCE the size of the floor units (tiles, planks, or grains) to match a realistic human scale. They must look appropriately small relative to the furniture and room volume. Avoid oversized textures.
 
         COLOR RULE: Ensure the new floor material (Image 2) blends naturally with the lighting context of the new generated scene while maintaining its inherent material identity.
         
         INPUT HIERARCHY:
-        - IMAGE 1: STYLE, LAYOUT, & ELEMENT REFERENCE.
+        - IMAGE 1: STYLE, MOOD, & ELEMENT INSPIRATION.
         - IMAGE 2: ABSOLUTE FLOOR MATERIAL SOURCE.
 
         [POV SETTINGS]:
@@ -909,7 +911,7 @@ High-end flooring commercial video.
         [MATERIAL SPECS]:
         ${floorDesc}
 
-        RENDER: Photorealistic, 8k architectural visualization, professional interior photography style.`;
+        RENDER: Photorealistic, 8k architectural visualization, professional interior photography style, high-end editorial look.`;
 
         const renderParts: any[] = [];
         if (roomImgBase64) {
