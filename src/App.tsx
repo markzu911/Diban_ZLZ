@@ -883,31 +883,33 @@ High-end flooring commercial video.
         - COLOR INTEGRITY: ${materialImgBase64 ? 'EXTRACT ALL HEX-COLOR DATA FROM IMAGE 2. NON-NEGOTIABLE.' : `Use color: ${step3.floorDetails?.color || 'as specified in material name'}.`}
         - PHYSICAL ATTRIBUTES: Shape: ${step3.floorDetails?.shape || 'Geometric'}; Pattern: ${step3.floorDetails?.pattern || 'Standard'}; Relief: ${step3.floorDetails?.relief || 'High-fidelity'}; Sheen: ${step3.floorDetails?.finish || 'Professional'}.`;
 
-        const renderPrompt = `[CRITICAL MISSION: TOTAL FLOOR OVERWRITE & PERSPECTIVE ALIGNMENT]
+        const renderPrompt = `[MISSION: GENERATIVE ARCHITECTURAL STYLING]
         
-        TASK: YOU MUST COMPLETELY DELETE AND REPLACE THE FLOOR IN IMAGE 1. 
-        IGNORE THE FLOORING PRESENT IN IMAGE 1 ENTIRELY, BUT YOU MUST DETECT AND PRESERVE ITS 3D PERSPECTIVE PLANES, GRID PATTERN ORIENTATION, AND DIRECTIONAL SEAM FLOW.
+        TASK: GENERATE a new high-end architectural scene based on the style and elements found in IMAGE 1.
         
-        [TEXTURE ORIENTATION & PERSPECTIVE RULE]:
-        1. DETECT perspective flow: Closely analyze the perspective grid, joint lines, or seam directions of the original floor in IMAGE 1. Note how they converge towards the vanishing points in the background.
-        2. ALIGN material patterns: Replicate the new material from IMAGE 2 onto the floor plane, ensuring that its texture grain, grids, tile seams, or planks align EXACTLY with the directional vectors and perspective angles of the original floor in IMAGE 1.
-        3. Do NOT rotate or distort the texture arbitrarily. The orientation of the new tiles/planks must match the spatial flow in IMAGE 1 with 100% geometric consistency.
+        [STYLE & COMPOSITION REFERENCE (IMAGE 1)]:
+        1. ATMOSPHERE: Replicate the ${step3.designStyle} design style and ${step3.lighting} mood from Image 1.
+        2. ELEMENTS: Include key architectural elements and furniture: ${step3.obstacles.join(', ')}.
+        3. SPATIAL FLOW: Maintain a similar perspective and layout as Image 1, but feel free to enhance the composition for maximum aesthetic impact.
         
-        COLOR MASTER RULE: The pixels on the floor plane MUST match the exact chroma and saturation of Image 2. 
-        PRESERVE the material's native color even under the room's localized lighting. No color shift allowed.
+        [FLOOR MATERIAL MASTER (IMAGE 2)]:
+        1. MANDATORY FLOOR: You MUST use the exact flooring material from IMAGE 2.
+        2. ORIENTATION: Align the material's grain, planks, or grid seams with the detected perspective flow of the room from Image 1.
+        3. COLOR & TEXTURE: Image 2 is the absolute reference for floor color, sheen, and physical relief. Do not deviate from Image 2.
+
+        COLOR RULE: Ensure the new floor material (Image 2) blends naturally with the lighting context of the new generated scene while maintaining its inherent material identity.
         
         INPUT HIERARCHY:
-        1. IMAGE 1: Use for ROOM GEOMETRY, FURNITURE LAYOUT, and FLOOR SEAM ORIENTATION REFERENCE ONLY. (Preserve: ${step3.obstacles.join(', ')}).
-        2. IMAGE 2: Use as the ABSOLUTE TEXTURE & COLOR TEMPLATE for the floor.
+        - IMAGE 1: STYLE, LAYOUT, & ELEMENT REFERENCE.
+        - IMAGE 2: ABSOLUTE FLOOR MATERIAL SOURCE.
 
-        [POV & LIGHTING]:
+        [POV SETTINGS]:
         ${anglePrompt}
 
         [MATERIAL SPECS]:
         ${floorDesc}
 
-        ENVIRONMENT: ${step3.lighting} mode. Seamlessly blend the NEW floor with existing furniture bases.
-        RENDER: Hyper-realistic, 8k cinematic architectural shot.`;
+        RENDER: Photorealistic, 8k architectural visualization, professional interior photography style.`;
 
         const renderParts: any[] = [];
         if (roomImgBase64) {
