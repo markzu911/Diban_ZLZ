@@ -873,12 +873,12 @@ High-end flooring commercial video.
           - Camera: 100mm macro lens, extreme close-up.
           - Composition: A bird's-eye view looking 45 degrees down at the floor surface from 40cm height. No furniture visible. The frame is 100% focused on the floor material.
           - Key Features: Emphasize the ${step3.floorDetails?.texture || 'deep grain'}, the ${step3.floorDetails?.relief || 'physical bumps/relief'}, and the ${step3.floorDetails?.finish || 'matte/glossy'} sheen. 
-          - Detail: Show the micro-texture of the joints and the tactile quality of the ${step3.targetFloor}.
+          - Detail: Show the micro-texture of the joints and the tactile quality of the ${materialImgBase64 ? 'material in IMAGE 2' : step3.targetFloor}.
           - Lighting: High-contrast directional lighting to cast tiny shadows in the recesses of the texture.`;
         }
 
         const floorDesc = `[GROUND TRUTH: TARGET MATERIAL REPLACEMENT]
-        - REQUIRED MATERIAL: ${step3.targetFloor}
+        - REQUIRED MATERIAL: ${materialImgBase64 ? 'The exact physical material, style, and texture shown in IMAGE 2 (Completely override and ignore any text reference to wood or planks if Image 2 shows stone/tile, or vice versa)' : step3.targetFloor}
         - SOURCE VALIDATION: Image 2 contains the ONLY valid material. REPLICATE ITS TEXTURE 1:1.
         - COLOR INTEGRITY: ${materialImgBase64 ? 'EXTRACT ALL HEX-COLOR DATA FROM IMAGE 2. NON-NEGOTIABLE.' : `Use color: ${step3.floorDetails?.color || 'as specified in material name'}.`}
         - PHYSICAL ATTRIBUTES: Shape: ${step3.floorDetails?.shape || 'Geometric'}; Pattern: ${step3.floorDetails?.pattern || 'Standard'}; Relief: ${step3.floorDetails?.relief || 'High-fidelity'}; Sheen: ${step3.floorDetails?.finish || 'Professional'}.`;
@@ -894,7 +894,7 @@ High-end flooring commercial video.
         3. SPATIAL VARIATION: Move the camera. Change the vantage point. IMAGE 1 is only for style and item inspiration, NOT a geometric constraint.
         
         [FLOOR MATERIAL MASTER (IMAGE 2)]:
-        1. MANDATORY FLOOR: You MUST use the exact flooring material from IMAGE 2.
+        1. MANDATORY FLOOR: You MUST use the exact flooring material from IMAGE 2. If Image 2 shows a grey slate, stone, concrete, or tile, the output MUST have that exact grey slate, stone, concrete, or tile. Do NOT generate wood or planks unless Image 2 actually shows wood.
         2. PERSPECTIVE: The material's grain, planks, or grid seams MUST flow naturally with the new perspective you create for this generated scene.
         3. COLOR & TEXTURE: Image 2 is the absolute reference for floor color, sheen, and physical relief. Do not deviate.
         4. SCALE: REDUCE the size of the floor units (tiles, planks, or grains) to match a realistic human scale. They must look appropriately small relative to the furniture and room volume. Avoid oversized textures.
