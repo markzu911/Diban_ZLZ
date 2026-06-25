@@ -869,12 +869,12 @@ High-end flooring commercial video.
           - Focus: Sharp focus on the floor texture where it meets the furniture bases, with a slightly soft background.
           - Lighting: Targeted side-lighting to emphasize ${step3.floorDetails?.relief || 'the physical surface relief'}.`;
         } else if (angle === '细节') {
-          anglePrompt = `[CAMERA & PERSPECTIVE: MACRO DETAIL]
-          - Camera: 100mm macro lens, extreme close-up.
-          - Composition: A bird's-eye view looking 45 degrees down at the floor surface from 40cm height. No furniture visible. The frame is 100% focused on the floor material.
-          - Key Features: Emphasize the ${step3.floorDetails?.texture || 'deep grain'}, the ${step3.floorDetails?.relief || 'physical bumps/relief'}, and the ${step3.floorDetails?.finish || 'matte/glossy'} sheen. 
-          - Detail: Show the micro-texture of the joints and the tactile quality of the ${materialImgBase64 ? 'material in IMAGE 2' : step3.targetFloor}.
-          - Lighting: High-contrast directional lighting to cast tiny shadows in the recesses of the texture.`;
+          anglePrompt = `[CAMERA & PERSPECTIVE: LOW-ANGLE MATERIAL FOCUS]
+          - Camera: 35mm wide-angle lens, extremely low-angle position (10-15cm above floor level).
+          - Composition: Focus on the floor plane extending into the scene. Include partial silhouettes or bases of ${step3.obstacles.slice(0, 3).join(', ') || 'furniture, a rug edge, and table legs'} in the mid-ground to provide architectural scale.
+          - Framing: The bottom 60% of the frame is the high-fidelity floor material. The perspective should emphasize the vanishing lines and joint depth of the flooring.
+          - Detail: Capture the tactile grain and physical relief of the ${materialImgBase64 ? 'material in IMAGE 2' : step3.targetFloor}, specifically how the lighting highlights the ${step3.floorDetails?.texture || 'surface texture'}.
+          - Lighting: Cinematic low-angle lighting that creates soft shadows and emphasizes the ${step3.floorDetails?.finish || 'surface sheen'}.`;
         }
 
         const floorDesc = `[GROUND TRUTH: TARGET MATERIAL REPLACEMENT]
