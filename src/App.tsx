@@ -33,6 +33,7 @@ import { callGemini } from './lib/gemini';
 import { resizeImage } from './lib/image-utils';
 
 import { persistResultImage, getDirectUploadToken, commitUpload } from './lib/upload';
+import AgentGenerator from './components/AgentGenerator';
 
 // --- Types ---
 
@@ -465,7 +466,7 @@ export default function App() {
   const [history, setHistory] = useState<RenderResult[]>([]);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
   const [showGallery, setShowGallery] = useState(false);
-  const [currentView, setCurrentView] = useState<'images' | 'video'>('images');
+  const [currentView, setCurrentView] = useState<'images' | 'video' | 'agent'>('images');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedVideoSourceId, setSelectedVideoSourceId] = useState<string | null>(null);
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
@@ -997,7 +998,7 @@ High-end flooring commercial video.
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FD] font-sans text-gray-900 selection:bg-[#5B50FF]/10 flex overflow-x-hidden">
+    <div className="h-screen bg-[#F8F9FD] font-sans text-gray-900 selection:bg-[#5B50FF]/10 flex overflow-hidden">
       {/* Sidebar Navigation */}
       <motion.div 
         animate={{ width: isSidebarCollapsed ? 84 : 260 }}
@@ -1029,6 +1030,7 @@ High-end flooring commercial video.
         <nav className="flex-1 px-4 space-y-2">
           {[
             { id: 'images', label: '效果图生成', icon: LayoutGrid },
+            { id: 'agent', label: '智能体生成', icon: Sparkles },
             { id: 'video', label: '演示视频', icon: VideoIcon },
           ].map((item) => {
             const isActive = currentView === item.id;
@@ -1084,7 +1086,7 @@ High-end flooring commercial video.
       {/* Content Wrapper */}
       <motion.div 
         animate={{ paddingLeft: isSidebarCollapsed ? 84 : 260 }}
-        className="flex-1 min-w-0"
+        className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden"
       >
         {/* SaaS User Bar */}
         {saas.initialized && saas.user && (
@@ -1134,27 +1136,28 @@ High-end flooring commercial video.
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="max-w-7xl mx-auto px-6 py-12 pb-32"
+              className="flex-1 overflow-y-auto w-full"
             >
-              <AnimatePresence>
-                {saas.insufficientPoints && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 shadow-sm"
-                  >
-                    <AlertCircle className="w-5 h-5 shrink-0" />
-                    <p className="text-sm font-bold tracking-tight">账户积分不足，无法启动渲染。请及时充值或联系管理员。</p>
-                    <button 
-                      onClick={() => setSaas(p => ({ ...p, insufficientPoints: false }))}
-                      className="ml-auto text-xs font-black uppercase tracking-widest bg-white px-4 py-2 rounded-xl shadow-sm border border-red-100 hover:bg-red-100 transition-colors"
+              <div className="max-w-7xl mx-auto px-6 py-12">
+                <AnimatePresence>
+                  {saas.insufficientPoints && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 shadow-sm"
                     >
-                      我知道了
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                      <AlertCircle className="w-5 h-5 shrink-0" />
+                      <p className="text-sm font-bold tracking-tight">账户积分不足，无法启动渲染。请及时充值或联系管理员。</p>
+                      <button 
+                        onClick={() => setSaas(p => ({ ...p, insufficientPoints: false }))}
+                        className="ml-auto text-xs font-black uppercase tracking-widest bg-white px-4 py-2 rounded-xl shadow-sm border border-red-100 hover:bg-red-100 transition-colors"
+                      >
+                        我知道了
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
         
         {/* Top Section Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -1516,15 +1519,59 @@ High-end flooring commercial video.
             )}
           </div>
         </section>
+        
+        {/* Internal Footer for Images */}
+        <footer className="mt-40 text-center border-t border-gray-100 pt-20 pb-20">
+          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">
+            <span className="hover:text-[#5B50FF] transition-colors cursor-default">GEMINI 3.5 FLASH</span>
+            <span className="hover:text-[#5B50FF] transition-colors cursor-default">VE0-3.1 GENERATE</span>
+            <span className="hover:text-[#5B50FF] transition-colors cursor-default">VISION ENGINE V3.1</span>
+          </div>
+          <p className="text-gray-400 text-[10px] font-bold mt-10 uppercase tracking-widest opacity-50">© 2026 FLOORAI SYSTEM. EMPOWERED BY NEXT-GEN SPATIAL AI.</p>
+        </footer>
+      </div>
+    </motion.div>
+  ) : currentView === 'agent' ? (
+    <motion.div
+      key="agent"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 min-h-0 w-full overflow-hidden"
+            >
+              <AgentGenerator
+                roomImg={roomImg}
+                roomImgBase64={roomImgBase64}
+                materialImg={materialImg}
+                materialImgBase64={materialImgBase64}
+                step3={step3}
+                aspect={aspect}
+                quality={quality}
+                angles={angles}
+                history={history}
+                saas={saas}
+                setRoomImg={setRoomImg}
+                setRoomImgBase64={setRoomImgBase64}
+                setMaterialImg={setMaterialImg}
+                setMaterialImgBase64={setMaterialImgBase64}
+                setStep3={setStep3}
+                setAspect={setAspect}
+                setQuality={setQuality}
+                setHistory={setHistory}
+                handleGenerate={handleGenerate}
+                isGenerating={isGenerating}
+                setIsGenerating={setIsGenerating}
+              />
             </motion.div>
           ) : (
-            <motion.div 
+            <motion.div
               key="video"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="max-w-7xl mx-auto px-6 py-12 pb-32"
+              className="flex-1 overflow-y-auto w-full"
             >
+              <div className="max-w-7xl mx-auto px-6 py-12">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 {/* Left: Configuration */}
                 <div className="lg:col-span-4 space-y-6">
@@ -1722,21 +1769,23 @@ High-end flooring commercial video.
                   </div>
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <footer className="mt-40 text-center border-t border-gray-100 pt-20 pb-20">
-          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">
-            <span className="hover:text-[#5B50FF] transition-colors cursor-default">GEMINI 3.5 FLASH</span>
-            <span className="hover:text-[#5B50FF] transition-colors cursor-default">VE0-3.1 GENERATE</span>
-            <span className="hover:text-[#5B50FF] transition-colors cursor-default">VISION ENGINE V3.1</span>
-          </div>
-          <p className="text-gray-400 text-[10px] font-bold mt-10 uppercase tracking-widest opacity-50">© 2026 FLOORAI SYSTEM. EMPOWERED BY NEXT-GEN SPATIAL AI.</p>
-        </footer>
-      </motion.div>
-
-      {/* Overlays */}
+              
+              {/* Internal Footer for Images & Video */}
+              <footer className="mt-40 text-center border-t border-gray-100 pt-20 pb-20">
+                <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">
+                  <span className="hover:text-[#5B50FF] transition-colors cursor-default">GEMINI 3.5 FLASH</span>
+                  <span className="hover:text-[#5B50FF] transition-colors cursor-default">VE0-3.1 GENERATE</span>
+                  <span className="hover:text-[#5B50FF] transition-colors cursor-default">VISION ENGINE V3.1</span>
+                </div>
+                <p className="text-gray-400 text-[10px] font-bold mt-10 uppercase tracking-widest opacity-50">© 2026 FLOORAI SYSTEM. EMPOWERED BY NEXT-GEN SPATIAL AI.</p>
+              </footer>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+    
+    {/* Overlays */}
       <AnimatePresence>
         {showGallery && saas.userId && (
           <Gallery 
